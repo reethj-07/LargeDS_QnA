@@ -3,121 +3,404 @@
     "id": 1,
     "tier": "simple",
     "question": "What is the average rating in the All_Beauty category?",
-    "ground_truth_ids": [],
-    "notes": "After ingestion, fill ground_truth_ids with doc ids from a SQL snapshot or manual audit."
+    "ground_truth_ids": [
+      23769,
+      3802,
+      14127,
+      17326,
+      18890,
+      21904,
+      20894,
+      5619,
+      6657,
+      9774,
+      21774,
+      28824
+    ],
+    "retrieval_query": "All_Beauty skincare hair beauty"
   },
   {
     "id": 2,
     "tier": "simple",
     "question": "How many reviews mention the word moisturizer?",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      83,
+      90,
+      98,
+      155,
+      217,
+      255,
+      276,
+      326,
+      327,
+      328,
+      339,
+      341,
+      348,
+      350,
+      359
+    ],
+    "retrieval_query": "moisturizer cream lotion"
   },
   {
     "id": 3,
     "tier": "simple",
     "question": "Which ASIN has the most reviews in the dataset?",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      90035,
+      111050,
+      111051,
+      111054,
+      111057,
+      111059,
+      111064,
+      111080,
+      111081,
+      111092,
+      111094,
+      111095,
+      111141,
+      111145,
+      111147,
+      111149,
+      111162,
+      111166,
+      111172,
+      111174
+    ],
+    "retrieval_query": "B07543G29V product reviews"
   },
   {
     "id": 4,
     "tier": "simple",
     "question": "Show themes in 5-star reviews about fragrance.",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      9,
+      14,
+      73,
+      281,
+      346,
+      352,
+      357,
+      514,
+      664,
+      752,
+      766,
+      784
+    ],
+    "retrieval_query": "fragrance scent perfume smell"
   },
   {
     "id": 5,
     "tier": "aggregation",
     "question": "What percentage of verified_purchase reviews are 5-star?",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      40637,
+      140198,
+      146780,
+      94337,
+      46448,
+      15258,
+      6421,
+      102915,
+      145385,
+      97611,
+      10394,
+      45608
+    ],
+    "retrieval_query": "verified purchase five stars"
   },
   {
     "id": 6,
     "tier": "aggregation",
     "question": "Which category has the highest average rating?",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      90000,
+      90001,
+      90002,
+      90003,
+      90004,
+      90005,
+      90006,
+      90007,
+      90008,
+      90009,
+      90010,
+      90011
+    ],
+    "retrieval_query": "best rated category quality"
   },
   {
     "id": 7,
     "tier": "aggregation",
     "question": "What are the top 5 most helpful reviews by helpful_vote?",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      37722,
+      132436,
+      146528,
+      53735,
+      59801,
+      41414,
+      134827,
+      54648
+    ],
+    "retrieval_query": "helpful helpful_vote useful"
   },
   {
     "id": 8,
     "tier": "aggregation",
     "question": "How many reviews fall into each rating bucket (1-5)?",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      133947,
+      46073,
+      138734,
+      99918,
+      17105,
+      19926,
+      52480,
+      11313,
+      116562,
+      41140,
+      66146,
+      69853
+    ],
+    "retrieval_query": "rating stars one two three four five"
   },
   {
     "id": 9,
     "tier": "comparison",
     "question": "Compare average ratings between All_Beauty and Appliances.",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      30000,
+      30001,
+      30002,
+      30003,
+      30004,
+      30005
+    ],
+    "retrieval_query": "All_Beauty Appliances kitchen"
   },
   {
     "id": 10,
     "tier": "comparison",
     "question": "Compare customer sentiment in Amazon_Fashion vs Baby_Products.",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      60000,
+      60001,
+      60002,
+      60003,
+      60004,
+      60005,
+      60006,
+      60007,
+      120000,
+      120001,
+      120002,
+      120003,
+      120004,
+      120005,
+      120006,
+      120007
+    ],
+    "retrieval_query": "Amazon_Fashion Baby_Products clothing baby"
   },
   {
     "id": 11,
     "tier": "comparison",
     "question": "Are verified_purchase reviews higher rated on average than non-verified?",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      45001,
+      32796,
+      76311,
+      29917,
+      106666,
+      93880,
+      148416,
+      134834,
+      42753,
+      64752
+    ],
+    "retrieval_query": "verified purchase rating average"
   },
   {
     "id": 12,
     "tier": "comparison",
     "question": "Which category has more 1-star reviews in absolute count?",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      13202,
+      32895,
+      17465,
+      76641,
+      64350,
+      126126,
+      71507,
+      13870,
+      66654,
+      85209,
+      53973,
+      81782,
+      45402,
+      91937,
+      24665
+    ],
+    "retrieval_query": "one star negative worst"
   },
   {
     "id": 13,
     "tier": "multi_hop",
     "question": "Find a product (asin) that has both 5-star and 1-star reviews and summarize the split.",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      122895,
+      125745,
+      126083,
+      127243,
+      127562,
+      139189
+    ],
+    "retrieval_query": "B01KYZOFPG reviews ratings"
   },
   {
     "id": 14,
     "tier": "multi_hop",
     "question": "Identify complaints that recur across multiple reviews for the same asin.",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      270,
+      493,
+      587,
+      650,
+      696,
+      799,
+      934,
+      973,
+      1037,
+      1052,
+      1071,
+      1105
+    ],
+    "retrieval_query": "complaint defect quality issue"
   },
   {
     "id": 15,
     "tier": "multi_hop",
     "question": "Which Arts_Crafts_and_Sewing reviews mention shipping damage?",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      90000,
+      90001,
+      90005,
+      90025,
+      90177,
+      90220,
+      90325,
+      90549,
+      90575,
+      90600,
+      90601,
+      90606
+    ],
+    "retrieval_query": "Arts Crafts shipping damage broken"
   },
   {
     "id": 16,
     "tier": "multi_hop",
     "question": "Find highly rated reviews that still mention product defects.",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      1439,
+      3028,
+      3638,
+      3718,
+      3719,
+      8291,
+      8298,
+      11116,
+      11809,
+      14311
+    ],
+    "retrieval_query": "defect defective problem quality"
   },
   {
     "id": 17,
     "tier": "trend",
     "question": "What are common themes in 1-star Appliances reviews?",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      74191,
+      44738,
+      105668,
+      14101,
+      89450,
+      111579,
+      14325,
+      79717,
+      64741,
+      49705,
+      105032,
+      12477
+    ],
+    "retrieval_query": "negative complaint poor quality disappointed"
   },
   {
     "id": 18,
     "tier": "trend",
     "question": "Summarize strengths and weaknesses mentioned for Baby_Products.",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      132472,
+      121098,
+      131408,
+      135859,
+      143090,
+      126086,
+      137188,
+      132608,
+      139548,
+      134597,
+      135919,
+      149791
+    ],
+    "retrieval_query": "Baby_Products infant toddler safety"
   },
   {
     "id": 19,
     "tier": "trend",
     "question": "What quality issues appear across multiple buyers for the same product?",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      93004,
+      67486,
+      123513,
+      69850,
+      43913,
+      76603,
+      14879,
+      140097,
+      62316,
+      114455,
+      32971,
+      80712
+    ],
+    "retrieval_query": "quality manufacturing defect issue"
   },
   {
     "id": 20,
     "tier": "trend",
     "question": "Contrast what 5-star vs 1-star reviewers say about durability.",
-    "ground_truth_ids": []
+    "ground_truth_ids": [
+      128450,
+      127618,
+      62605,
+      62316,
+      62544,
+      90555,
+      122329,
+      107526,
+      71079,
+      55798,
+      145078,
+      62535
+    ],
+    "retrieval_query": "durability durable lasting quality"
   }
 ]

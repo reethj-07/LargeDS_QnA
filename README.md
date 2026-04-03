@@ -2,6 +2,17 @@
 
 AI agent pipeline over **150K+ Amazon product reviews** (McAuley-Lab `Amazon-Reviews-2023`, loaded via **direct JSONL download** from Hugging Face). The stack combines **FAISS** (dense vectors), **BM25** (keywords), **DuckDB** (SQL analytics), and a **multi-agent** flow (**Planner → Retriever → Analyst → Critic**) using **Groq** (free tier) and **LangGraph**.
 
+## Dataset description (assignment deliverable)
+
+| Item | Detail |
+|------|--------|
+| **Source** | [McAuley-Lab/Amazon-Reviews-2023](https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023) on Hugging Face Hub |
+| **Access** | Raw JSONL files under `raw/review_categories/*.jsonl` via `huggingface_hub.hf_hub_download` (the `datasets` Python API does not load this repo due to deprecated loading scripts). |
+| **Subset used** | 5 categories × 30,000 reviews = **150,000 rows**: All_Beauty, Appliances, Amazon_Fashion, Arts_Crafts_and_Sewing, Baby_Products |
+| **Fields stored** | `id`, `asin`, `category`, `rating`, `title`, `text`, `doc_text`, `timestamp`, `helpful_vote`, `verified_purchase` |
+| **Preprocessing** | Normalize Unicode (NFKC), strip HTML-like tags, build `doc_text = title + " " + text`, coerce `verified_purchase` to bool, drop empty rows |
+| **Artifacts** | Parquet (`data/processed/`), DuckDB + FAISS + BM25 (`data/indices/`) — large files gitignored; rebuild with `python scripts/ingest.py` |
+
 ## Requirements
 
 - Python 3.11+ (tested on 3.13)
@@ -54,13 +65,22 @@ Open the printed local URL (default `http://127.0.0.1:7860`).
 
 ### 4) Retrieval evaluation
 
-Populate `ground_truth_ids` in `evaluation/test_questions.json` (DuckDB `reviews.id` values) for meaningful Recall@K / Precision@K.
+After ingestion, optionally generate labels and short `retrieval_query` strings (see `evaluation/test_questions.json`):
 
 ```powershell
+python scripts/build_ground_truth.py
 python scripts/evaluate.py
 ```
 
-Writes `evaluation/cache/eval_results.json` and refreshes `EVALUATION_REPORT.md`.
+`scripts/evaluate.py` runs the retrieval batch and regenerates `EVALUATION_REPORT.md`
+
+(`evaluation/cache/` is gitignored; the report in the repo documents methodology and metrics).
+
+### 5) Submission (no video yet)
+
+- [ ] Repo **public** *or* **private** with collaborator `uptiq-chaitanya` (read) per assignment.
+- [ ] Submit **Google Form** with repo link: [forms.gle/9iPeUBHKcdHhuSq67](https://forms.gle/9iPeUBHKcdHhuSq67).
+- [ ] Record **demo video** (complex query + failure case) when ready — link in **`DEMO_VIDEO/README.md`**.
 
 ## Project layout
 
@@ -83,7 +103,7 @@ Writes `evaluation/cache/eval_results.json` and refreshes `EVALUATION_REPORT.md`
 
 ## Demo video
 
-Record a short walkthrough (complex query + a failure case) and link it in `DEMO_VIDEO/README.md` or your submission.
+Record a short walkthrough (complex query + a failure case) and paste the link in [`DEMO_VIDEO/README.md`](DEMO_VIDEO/README.md). **Optional until you record it** — everything else can be submitted without the video.
 
 ## Assignment checklist (from brief)
 

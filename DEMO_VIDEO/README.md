@@ -1,5 +1,7 @@
 # Demo video
 
+**Status:** Record when ready — not required to finish code/docs.
+
 Record a **Loom** or local MP4 showing:
 
 1. `python scripts/ingest.py` (or mention prebuilt indices)
