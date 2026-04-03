@@ -1,0 +1,33 @@
+# Environment
+.env
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Data & indices (large)
+data/raw/
+data/processed/
+data/indices/
+*.duckdb
+*.duckdb.wal
+*.faiss
+*.pkl
+*.pickle
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Logs & eval cache
+logs/
+evaluation/cache/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

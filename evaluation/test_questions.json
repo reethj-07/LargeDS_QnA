@@ -1,0 +1,123 @@
+[
+  {
+    "id": 1,
+    "tier": "simple",
+    "question": "What is the average rating in the All_Beauty category?",
+    "ground_truth_ids": [],
+    "notes": "After ingestion, fill ground_truth_ids with doc ids from a SQL snapshot or manual audit."
+  },
+  {
+    "id": 2,
+    "tier": "simple",
+    "question": "How many reviews mention the word moisturizer?",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 3,
+    "tier": "simple",
+    "question": "Which ASIN has the most reviews in the dataset?",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 4,
+    "tier": "simple",
+    "question": "Show themes in 5-star reviews about fragrance.",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 5,
+    "tier": "aggregation",
+    "question": "What percentage of verified_purchase reviews are 5-star?",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 6,
+    "tier": "aggregation",
+    "question": "Which category has the highest average rating?",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 7,
+    "tier": "aggregation",
+    "question": "What are the top 5 most helpful reviews by helpful_vote?",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 8,
+    "tier": "aggregation",
+    "question": "How many reviews fall into each rating bucket (1-5)?",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 9,
+    "tier": "comparison",
+    "question": "Compare average ratings between All_Beauty and Appliances.",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 10,
+    "tier": "comparison",
+    "question": "Compare customer sentiment in Amazon_Fashion vs Baby_Products.",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 11,
+    "tier": "comparison",
+    "question": "Are verified_purchase reviews higher rated on average than non-verified?",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 12,
+    "tier": "comparison",
+    "question": "Which category has more 1-star reviews in absolute count?",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 13,
+    "tier": "multi_hop",
+    "question": "Find a product (asin) that has both 5-star and 1-star reviews and summarize the split.",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 14,
+    "tier": "multi_hop",
+    "question": "Identify complaints that recur across multiple reviews for the same asin.",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 15,
+    "tier": "multi_hop",
+    "question": "Which Arts_Crafts_and_Sewing reviews mention shipping damage?",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 16,
+    "tier": "multi_hop",
+    "question": "Find highly rated reviews that still mention product defects.",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 17,
+    "tier": "trend",
+    "question": "What are common themes in 1-star Appliances reviews?",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 18,
+    "tier": "trend",
+    "question": "Summarize strengths and weaknesses mentioned for Baby_Products.",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 19,
+    "tier": "trend",
+    "question": "What quality issues appear across multiple buyers for the same product?",
+    "ground_truth_ids": []
+  },
+  {
+    "id": 20,
+    "tier": "trend",
+    "question": "Contrast what 5-star vs 1-star reviewers say about durability.",
+    "ground_truth_ids": []
+  }
+]
