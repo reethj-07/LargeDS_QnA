@@ -127,6 +127,13 @@ def run_agent_pipeline(
     user_query: str,
     hybrid: HybridRetriever | None = None,
 ) -> dict[str, Any]:
+    log_event(
+        "pipeline_query",
+        {
+            "char_len": len(user_query),
+            "query_preview": user_query[:400],
+        },
+    )
     h = hybrid or HybridRetriever()
     h.load_indices()
     app = build_graph(h)

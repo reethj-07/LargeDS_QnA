@@ -105,13 +105,30 @@ python scripts/evaluate.py
 
 Record a short walkthrough (complex query + a failure case) and paste the link in [`DEMO_VIDEO/README.md`](DEMO_VIDEO/README.md). **Optional until you record it** — everything else can be submitted without the video.
 
+## Observability (assignment bonus)
+
+Structured **JSON logs** (stdout + `logs/app.log`) via `src/observability/logger.py`:
+
+| Event | What is logged |
+|-------|----------------|
+| `pipeline_query` | User question length + preview (first 400 chars) |
+| `ingestion_*` | Load progress, parquet/DuckDB/BM25/FAISS paths and row counts |
+| `agent_planner` | `query_type` from Planner |
+| `retrieval_sql` / `retrieval_sql_error` | SQL row count or error message |
+| `retrieval_hybrid` | Doc count, **retrieved `reviews.id` list** (up to 30), sample fusion scores |
+| `agent_analyst` | Answer length |
+| `agent_critic` | Score, `needs_retry` |
+| `ui_query` | Query length (Gradio) |
+
+**Not included (optional):** LangSmith / OpenTelemetry tracing — would need API keys and extra deps; file + JSON logs cover the brief’s logging requirements.
+
 ## Assignment checklist (from brief)
 
 - Data platform: ingestion + **vector (FAISS)** + **hybrid (SQL + vector + BM25)**
 - Retrieval: embeddings + similarity; bonus hybrid search implemented
 - Agents: **Planner**, **Retriever**, **Analyst**, **Critic** (LangGraph)
 - Evaluation: **Recall@K**, **Precision@K** (when ground truth filled) + qualitative notes
-- Observability: structured logs under `logs/app.log`
+- Observability: structured logs under `logs/app.log` (see **Observability** above)
 
 ## License
 

@@ -8,6 +8,8 @@ from src.agents.tools import retrieve_bundle
 from src.config import FINAL_TOP_K
 from src.observability.logger import log_event
 from src.retrieval.hybrid_retriever import HybridRetriever
+
+
 def run_retrieval(
     hybrid: HybridRetriever,
     query: str,
@@ -28,5 +30,15 @@ def run_retrieval(
     sq = search_query.strip() or query
     docs, ranked, bundle = retrieve_bundle(hybrid, sq, top_k=FINAL_TOP_K)
     trace.append(f"Hybrid retrieval: {len(docs)} docs")
-    log_event("retrieval_hybrid", {"n_docs": len(docs)})
+    doc_ids = [d.get("id") for d in docs[:30]]
+    scores = [float(s) for _, s in ranked[:30]]
+    log_event(
+        "retrieval_hybrid",
+        {
+            "n_docs": len(docs),
+            "search_query_len": len(sq),
+            "retrieved_doc_ids": doc_ids,
+            "retrieval_scores_sample": scores[:10],
+        },
+    )
     return docs, sql_results, ranked, bundle
