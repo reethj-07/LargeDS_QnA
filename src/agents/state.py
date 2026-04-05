@@ -10,8 +10,14 @@ class AgentState(TypedDict, total=False):
     query: str
     query_type: str
     plan: str
+    route: str  # "direct" | "decompose" | "sql_first"
     sql_suggestion: str
     search_query: str
+
+    # Sub-question decomposition (multi-hop / comparison)
+    sub_questions: list[str]
+    sub_answers: list[dict[str, Any]]
+
     retrieved_docs: list[dict[str, Any]]
     sql_results: list[dict[str, Any]]
     retrieval_scores: list[tuple[int, float]]

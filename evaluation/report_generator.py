@@ -18,14 +18,16 @@ def generate_report(results_path: Path, out_path: Path) -> None:
         "same ASIN). This is a **strict** SQL view of relevance.\n"
     )
     lines.append(
-        "- **Retrieval:** Hybrid search (FAISS + BM25 + RRF) uses `retrieval_query` per question — a "
-        "short keyword-style string (see `evaluation/test_questions.json`). Full natural-language "
-        "questions were found to dilute BM25; short queries align better with SQL-derived labels.\n"
+        "- **Retrieval:** Hybrid search (FAISS + BM25 + RRF, then optional **cross-encoder** rerank on a "
+        "pool of candidates) uses `retrieval_query` per question — a short keyword-style string (see "
+        "`evaluation/test_questions.json`). Full natural-language questions were found to dilute BM25; "
+        "short queries align better with SQL-derived labels.\n"
     )
     lines.append(
         "- **Metrics:** **Recall@K** = |retrieved ∩ relevant| / |relevant|; **Precision@K** = "
         "|retrieved ∩ relevant| / K; **Hit@K** = 1 if at least one relevant id appears in the top-K "
-        "results, else 0.\n"
+        "results; **MRR@K** = reciprocal rank of the first relevant hit; **nDCG@K** = normalized "
+        "discounted cumulative gain (binary relevance).\n"
     )
     lines.append(
         "- **Interpretation:** Absolute scores are often modest because SQL relevance sets are large "
@@ -33,26 +35,35 @@ def generate_report(results_path: Path, out_path: Path) -> None:
         "for **before/after** comparisons (e.g. ablations), not as an absolute ceiling.\n"
     )
 
-    lines.append("\n## Retrieval (hybrid FAISS + BM25 + RRF)\n")
-    lines.append("| id | tier | Recall@10 | Precision@10 | Hit@10 |")
-    lines.append("|---:|---|---:|---:|:---:|")
+    lines.append("\n## Retrieval (hybrid FAISS + BM25 + RRF + optional cross-encoder)\n")
+    lines.append("| id | tier | Recall@10 | Precision@10 | MRR@10 | nDCG@10 | Hit@10 |")
+    lines.append("|---:|---|---:|---:|---:|---:|:---:|")
     for r in rows:
         rk = r.get("recall_at_k")
         pk = r.get("precision_at_k")
+        mk = r.get("mrr_at_k")
+        nk = r.get("ndcg_at_k")
         hk = r.get("hit_at_k")
         lines.append(
             f"| {r.get('id')} | {r.get('tier')} | "
             f"{rk if rk is not None else 'N/A'} | {pk if pk is not None else 'N/A'} | "
+            f"{mk if mk is not None else 'N/A'} | {nk if nk is not None else 'N/A'} | "
             f"{hk if hk is not None else 'N/A'} |"
         )
 
     vals_r = [r["recall_at_k"] for r in rows if r.get("recall_at_k") is not None]
     vals_p = [r["precision_at_k"] for r in rows if r.get("precision_at_k") is not None]
+    vals_m = [r["mrr_at_k"] for r in rows if r.get("mrr_at_k") is not None]
+    vals_n = [r["ndcg_at_k"] for r in rows if r.get("ndcg_at_k") is not None]
     vals_h = [r["hit_at_k"] for r in rows if r.get("hit_at_k") is not None]
     if vals_r:
         lines.append("\n### Aggregate (n=20)\n")
         lines.append(f"- **Mean Recall@10:** {sum(vals_r) / len(vals_r):.4f}")
         lines.append(f"- **Mean Precision@10:** {sum(vals_p) / len(vals_p):.4f}")
+        if vals_m:
+            lines.append(f"- **Mean MRR@10:** {sum(vals_m) / len(vals_m):.4f}")
+        if vals_n:
+            lines.append(f"- **Mean nDCG@10:** {sum(vals_n) / len(vals_n):.4f}")
         lines.append(f"- **Hit@10 rate:** {sum(vals_h)}/{len(vals_h)} questions with ≥1 overlap in top-10")
 
     by_tier: dict[str, list[float]] = defaultdict(list)
@@ -106,15 +117,58 @@ def generate_report(results_path: Path, out_path: Path) -> None:
         "trade some semantic nuance.\n"
     )
     lines.append(
-        "- **RRF** instead of a cross-encoder reranker — faster and no extra model load; trade some "
-        "precision for latency.\n"
+        "- **RRF + cross-encoder** — RRF fuses dense+sparse lists; a small MS MARCO cross-encoder "
+        "(`cross-encoder/ms-marco-MiniLM-L-6-v2`) reranks a pool on CPU. Set `USE_CROSS_ENCODER=0` to "
+        "skip rerank for speed or CI.\n"
     )
     lines.append(
         "- **Groq free tier** — fast and free; vendor lock-in and rate limits vs self-hosted LLM.\n"
     )
 
+    # --- Ablation section (if cache exists) ---
+    ablation_path = out_path.parent / "evaluation" / "cache" / "ablation.json"
+    if not ablation_path.exists():
+        ablation_path = out_path.parent.parent / "evaluation" / "cache" / "ablation.json"
+    if ablation_path.exists():
+        ab = json.loads(ablation_path.read_text(encoding="utf-8"))
+        lines.append("\n## Ablation study\n")
+        lines.append("| Mode | Recall@10 | Precision@10 | MRR@10 | nDCG@10 | Hit rate |")
+        lines.append("|------|---:|---:|---:|---:|---:|")
+        for r in ab:
+            lines.append(
+                f"| {r['mode']} | {r.get('recall',0):.4f} | {r.get('precision',0):.4f} | "
+                f"{r.get('mrr',0):.4f} | {r.get('ndcg',0):.4f} | {r.get('hit_rate',0):.4f} |"
+            )
+
+    # --- Answer quality section (if cache exists) ---
+    aq_path = out_path.parent / "evaluation" / "cache" / "answer_quality.json"
+    if not aq_path.exists():
+        aq_path = out_path.parent.parent / "evaluation" / "cache" / "answer_quality.json"
+    if aq_path.exists():
+        aq = json.loads(aq_path.read_text(encoding="utf-8"))
+        scores = [r["critic_score"] for r in aq if r.get("critic_score") is not None]
+        lines.append("\n## Answer quality (quantitative, batch)\n")
+        if scores:
+            lines.append(f"- **Questions scored:** {len(scores)}/{len(aq)}")
+            lines.append(f"- **Mean critic score:** {sum(scores)/len(scores):.2f} / 5")
+            lines.append(f"- **Min:** {min(scores):.1f} | **Max:** {max(scores):.1f}")
+            lines.append(f"- **Score >= 4 (good/great):** {sum(1 for s in scores if s >= 4)}/{len(scores)}")
+        lats = [r["latency_s"] for r in aq if r.get("latency_s") is not None]
+        if lats:
+            lines.append(f"- **Mean latency:** {sum(lats)/len(lats):.1f}s per question")
+        errs = [r for r in aq if "error" in r]
+        if errs:
+            lines.append(f"- **Pipeline errors:** {len(errs)}/{len(aq)}")
+
     lines.append("\n## Regenerating this report\n")
-    lines.append("```powershell\npython scripts/build_ground_truth.py   # after ingest; optional\npython scripts/evaluate.py\n```\n")
+    lines.append(
+        "```powershell\n"
+        "python scripts/build_ground_truth.py   # after ingest; optional\n"
+        "python scripts/evaluate.py\n"
+        "python scripts/ablation.py             # optional ablation\n"
+        "python scripts/answer_quality.py       # optional batch answer quality\n"
+        "```\n"
+    )
 
     out_path.write_text("\n".join(lines), encoding="utf-8")
 

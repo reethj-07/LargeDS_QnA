@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from evaluation.metrics import precision_at_k, recall_at_k  # noqa: E402
+from evaluation.metrics import mrr_at_k, ndcg_at_k, precision_at_k, recall_at_k  # noqa: E402
 from src.embeddings.embedder import Embedder  # noqa: E402
 from src.retrieval.hybrid_retriever import HybridRetriever  # noqa: E402
 
@@ -42,9 +42,13 @@ def main() -> None:
         if rel:
             r_at_k = recall_at_k(retrieved_ids, rel, args.k)
             p_at_k = precision_at_k(retrieved_ids, rel, args.k)
+            m_at_k = mrr_at_k(retrieved_ids, rel, args.k)
+            n_at_k = ndcg_at_k(retrieved_ids, rel, args.k)
         else:
             r_at_k = None
             p_at_k = None
+            m_at_k = None
+            n_at_k = None
         hit = None
         if rel:
             topk = set(retrieved_ids[: args.k])
@@ -57,6 +61,8 @@ def main() -> None:
                 "retrieval_query_used": q_ret,
                 "recall_at_k": r_at_k,
                 "precision_at_k": p_at_k,
+                "mrr_at_k": m_at_k,
+                "ndcg_at_k": n_at_k,
                 "hit_at_k": hit,
                 "retrieved_top_k": retrieved_ids[: args.k],
             }
@@ -69,9 +75,13 @@ def main() -> None:
     if with_ground:
         avg_r = sum(r["recall_at_k"] for r in rows_out if r["recall_at_k"] is not None) / with_ground
         avg_p = sum(r["precision_at_k"] for r in rows_out if r["precision_at_k"] is not None) / with_ground
+        avg_m = sum(r["mrr_at_k"] for r in rows_out if r["mrr_at_k"] is not None) / with_ground
+        avg_n = sum(r["ndcg_at_k"] for r in rows_out if r["ndcg_at_k"] is not None) / with_ground
         hits = sum(r["hit_at_k"] for r in rows_out if r.get("hit_at_k") is not None)
         print(f"Mean Recall@{args.k}: {avg_r:.4f}")
         print(f"Mean Precision@{args.k}: {avg_p:.4f}")
+        print(f"Mean MRR@{args.k}: {avg_m:.4f}")
+        print(f"Mean nDCG@{args.k}: {avg_n:.4f}")
         print(f"Hit@{args.k} (>=1 relevant doc in top-{args.k}): {hits}/{with_ground}")
 
 

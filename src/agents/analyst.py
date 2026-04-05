@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_groq import ChatGroq
 
-from src.config import GROQ_API_KEY, MODEL_ANALYST
+from src.llm.chat import get_chat_llm, require_any_llm_key
 
 
 SYSTEM = """You are an analyst answering questions using ONLY the provided evidence:
@@ -30,13 +29,8 @@ def run_analyst(
     sql_block: str,
     context_block: str,
 ) -> str:
-    if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY is not set.")
-    llm = ChatGroq(
-        groq_api_key=GROQ_API_KEY,
-        model_name=MODEL_ANALYST,
-        temperature=0.2,
-    )
+    require_any_llm_key()
+    llm = get_chat_llm("analyst")
     human = f"""User question: {user_query}
 
 Planner plan:

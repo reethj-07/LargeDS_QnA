@@ -28,6 +28,20 @@ logs/
 evaluation/cache/
 *.log
 
+# Test / build caches
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Assignment PDF (do not ship problem statement in solution repo)
+Large Dataset Q&A.pdf
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Local editor / scratch
+.cursor/
+*.tmp
+*.bak

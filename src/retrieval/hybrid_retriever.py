@@ -6,7 +6,15 @@ from typing import Any
 
 import numpy as np
 
-from src.config import BM25_TOP_K, DUCKDB_PATH, FINAL_TOP_K, RRF_K, VECTOR_TOP_K
+from src.config import (
+    BM25_TOP_K,
+    DUCKDB_PATH,
+    FINAL_TOP_K,
+    RERANK_POOL,
+    RRF_K,
+    USE_CROSS_ENCODER,
+    VECTOR_TOP_K,
+)
 from src.embeddings.embedder import Embedder
 from src.retrieval.reranker import reciprocal_rank_fusion
 from src.storage.bm25_store import BM25Store
@@ -46,6 +54,8 @@ class HybridRetriever:
         top_k: int | None = None,
         use_vector: bool = True,
         use_bm25: bool = True,
+        *,
+        use_cross_encoder: bool | None = None,
     ) -> list[tuple[int, float]]:
         top_k = top_k or FINAL_TOP_K
         lists: list[list[tuple[int, float]]] = []
@@ -56,7 +66,28 @@ class HybridRetriever:
         if not lists:
             return []
         merged = reciprocal_rank_fusion(lists, k=RRF_K)
-        return merged[:top_k]
+        ce = USE_CROSS_ENCODER if use_cross_encoder is None else use_cross_encoder
+        if not ce:
+            return merged[:top_k]
+        pool = merged[: min(RERANK_POOL, len(merged))]
+        ids = [i for i, _ in pool]
+        if not ids:
+            return []
+        docs = self.fetch_documents(ids)
+        self._last_fetched = {int(d["id"]): d for d in docs}
+        aligned_ids: list[int] = []
+        texts: list[str] = []
+        for i in ids:
+            if i not in self._last_fetched:
+                continue
+            row = self._last_fetched[i]
+            texts.append(str(row.get("doc_text") or row.get("text") or ""))
+            aligned_ids.append(i)
+        if not aligned_ids:
+            return merged[:top_k]
+        from src.retrieval.reranker import cross_encoder_rerank
+
+        return cross_encoder_rerank(query, aligned_ids, texts, top_k=top_k)
 
     def fetch_documents(self, doc_ids: list[int]) -> list[dict[str, Any]]:
         if not doc_ids:
@@ -78,7 +109,11 @@ class HybridRetriever:
         """Return documents (with text) and id-score pairs."""
         ranked = self.hybrid_search(query, top_k=top_k, use_vector=use_vector, use_bm25=use_bm25)
         ids = [i for i, _ in ranked]
-        docs = self.fetch_documents(ids)
+        cache = getattr(self, "_last_fetched", {})
+        if cache and all(i in cache for i in ids):
+            docs = [cache[i] for i in ids]
+        else:
+            docs = self.fetch_documents(ids)
         return docs, ranked
 
     def sql_query(self, sql: str) -> list[dict[str, Any]]:

@@ -13,20 +13,36 @@ flowchart TD
         Prep --> BM25[BM25Okapi]
     end
 
-    subgraph online [Query online]
-        Q[User query] --> P[Planner Groq]
-        P --> R[Retriever hybrid]
-        R --> V[FAISS search]
-        R --> B[BM25 search]
-        R --> S[Optional DuckDB SQL]
-        V --> RRF[RRF merge]
-        B --> RRF
-        RRF --> A[Analyst Groq]
-        A --> C[Critic Groq]
-        C -->|retry if low score| R
-        C --> O[Answer + trace]
+    subgraph online [Query online -- multi-agent]
+        Q[User query] --> P[Planner Agent]
+        P --> Router{Router}
+
+        Router -->|"aggregation"| SQL1[SQL-first Retriever]
+        Router -->|"multi_hop / comparison"| Decomp[Decomposer Agent]
+        Router -->|"factual / trend"| Direct[Direct Retriever]
+
+        Decomp --> SubRet[Sub-question Retrieval]
+        SubRet --> Synth[Synthesizer]
+
+        SQL1 --> Analyst[Analyst Agent]
+        Synth --> Analyst
+        Direct --> Analyst
+
+        Analyst --> Critic[Critic Agent]
+        Critic -->|"retry if low score"| Direct
+        Critic --> Output[Answer + trace]
     end
 ```
+
+## Multi-agent routing
+
+The Planner classifies each query and assigns a **route**:
+
+| Route | When | Path |
+|-------|------|------|
+| `direct` | Simple factual or single-topic lookup | Planner -> Retriever -> Analyst -> Critic |
+| `sql_first` | Aggregation / counting / stats queries | Planner -> SQL-first Retriever -> Analyst -> Critic |
+| `decompose` | Multi-hop, comparison, complex reasoning | Planner -> Decomposer -> Sub-Retrieval -> Synthesizer -> Analyst -> Critic |
 
 ## Components
 
@@ -37,15 +53,26 @@ flowchart TD
 | Dense retrieval | `sentence-transformers/all-MiniLM-L6-v2` + FAISS | Cosine similarity via normalized inner product |
 | Sparse retrieval | `rank_bm25` | Keyword / lexical match |
 | Fusion | Reciprocal Rank Fusion (RRF) | Merge ranked lists without score calibration |
-| Planner | `llama-3.1-8b-instant` (Groq) | Query type + plan + optional `SELECT` |
-| Analyst | `llama-3.3-70b-versatile` (Groq) | Grounded answer with `[id=]` citations |
-| Critic | `llama-3.3-70b-versatile` (Groq) | JSON score + retry signal |
-| Orchestration | LangGraph `StateGraph` | Planner → retrieve → analyst → critic → optional retry |
+| Rerank | Cross-encoder (MS MARCO MiniLM, CPU) | Rescore top pool after RRF; disable with `USE_CROSS_ENCODER=0` |
+| Planner agent | Gemini (`gemini-2.5-flash` default) or Groq `llama-3.1-8b-instant` | Query type + route + plan + optional `SELECT` |
+| Decomposer agent | Same as planner | Break multi-hop queries into 2-4 sub-questions |
+| Analyst agent | Gemini (`gemini-2.5-pro` default) or Groq `llama-3.3-70b-versatile` | Grounded answer with `[id=]` citations |
+| Critic agent | Gemini (`gemini-2.5-flash` default) or Groq `llama-3.3-70b-versatile` | JSON score + retry signal |
+| LLM routing | `src/llm/chat.py` | If both Gemini + Groq keys exist: **Gemini first**, **Groq fallback** on errors / rate limits |
+| Orchestration | LangGraph `StateGraph` | Multi-path routing with conditional edges |
 
 ## Observability
 
-- JSON lines to stdout and `logs/app.log` via `src/observability/logger.py`
-- Gradio shows agent trace + retrieved ids
+- **Structured JSON logs** to stdout and `logs/app.log` via `src/observability/logger.py`
+- **Trace ID** correlation across all log events within a pipeline invocation
+- **LangSmith** (optional): set `LANGCHAIN_TRACING_V2=true` + `LANGCHAIN_API_KEY` for automatic tracing of all LangChain/LangGraph calls
+- **OpenTelemetry** (optional): set `OTEL_ENABLED=true` for per-node spans exported to console or OTLP collector
+- **Gradio UI**: Agent Trace tab shows routing decisions, sub-questions, latency, and critic feedback
+
+## Deployment
+
+- **Docker**: `docker build -t bigdata-qna . && docker run -p 7860:7860 --env-file .env bigdata-qna`
+- **Render**: push repo, Render auto-detects `render.yaml` (Docker service with persistent disk for data)
 
 ## Security
 

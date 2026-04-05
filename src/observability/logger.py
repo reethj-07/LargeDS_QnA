@@ -1,4 +1,4 @@
-"""Structured logging for queries, retrieval, and agent decisions."""
+"""Structured logging with trace-id correlation for queries, retrieval, and agent decisions."""
 
 from __future__ import annotations
 
@@ -38,10 +38,13 @@ def log_event(
     payload: dict[str, Any] | None = None,
     logger: logging.Logger | None = None,
 ) -> None:
-    """Emit one JSON line for observability."""
+    """Emit one JSON line for observability, enriched with trace_id."""
+    from src.observability.tracing import get_trace_id
+
     log = logger or get_logger()
-    line = {
+    line: dict[str, Any] = {
         "ts": datetime.now(timezone.utc).isoformat(),
+        "trace_id": get_trace_id(),
         "event": event,
         **(payload or {}),
     }

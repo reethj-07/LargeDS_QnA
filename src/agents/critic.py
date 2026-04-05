@@ -7,9 +7,9 @@ import re
 from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_groq import ChatGroq
 
-from src.config import GROQ_API_KEY, CRITIC_PASS_THRESHOLD, MODEL_CRITIC
+from src.config import CRITIC_PASS_THRESHOLD
+from src.llm.chat import get_chat_llm, require_any_llm_key
 from src.observability.logger import get_logger
 
 logger = get_logger(__name__)
@@ -39,13 +39,8 @@ def run_critic(
     answer: str,
     evidence_summary: str,
 ) -> tuple[float, str, bool]:
-    if not GROQ_API_KEY:
-        raise RuntimeError("GROQ_API_KEY is not set.")
-    llm = ChatGroq(
-        groq_api_key=GROQ_API_KEY,
-        model_name=MODEL_CRITIC,
-        temperature=0.0,
-    )
+    require_any_llm_key()
+    llm = get_chat_llm("critic")
     human = f"""Question: {user_query}
 
 Proposed answer:
