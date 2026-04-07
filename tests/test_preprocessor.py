@@ -55,4 +55,14 @@ def test_preprocess_records_filters_empty():
     assert len(out) == 1
     assert out[0]["id"] == 1
     assert out[0]["category"] == "test"
-    assert out[0]["doc_text"] == "Good Nice product"
+    assert out[0]["doc_text"] == "[test] Good Nice product"
+    assert "Good" in out[0]["doc_text"]
+
+
+def test_preprocess_records_category_prefix():
+    rows = [
+        {"title": "Lovely", "text": "Great item", "_category": "All_Beauty", "rating": 5.0},
+    ]
+    out = preprocess_records(rows, start_id=0)
+    assert out[0]["doc_text"].startswith("[All Beauty]")
+    assert "Lovely" in out[0]["doc_text"]

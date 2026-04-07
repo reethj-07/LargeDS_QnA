@@ -72,14 +72,14 @@ Open the printed local URL (default `http://localhost:7860`).
 
 ### 4) Retrieval evaluation
 
-After ingestion, optionally generate labels and short `retrieval_query` strings (see `evaluation/test_questions.json`):
+After ingestion, rebuild ground truth from DuckDB and run the evaluation pipeline:
 
 ```powershell
-python scripts/build_ground_truth.py
-python scripts/evaluate.py
+python scripts/build_ground_truth.py   # deterministic, content-aligned ground truth
+python scripts/evaluate.py             # Recall, Precision, MRR, nDCG, Hit@K
 ```
 
-`scripts/evaluate.py` runs the retrieval batch and regenerates `EVALUATION_REPORT.md` (Recall / Precision / Hit / **MRR / nDCG**).
+`scripts/evaluate.py` runs the retrieval batch with **eval_mode** awareness (retrieval-primary vs SQL-primary questions) and **category-filtered retrieval** for single-category queries, then regenerates `EVALUATION_REPORT.md`.
 
 ### 5) Ablation study
 
@@ -95,6 +95,14 @@ Run all 20 test questions through the full agent pipeline, collect critic scores
 
 ```powershell
 python scripts/answer_quality.py
+```
+
+### 6b) SQL accuracy (aggregation questions)
+
+Generate reference answers for SQL-primary questions:
+
+```powershell
+python scripts/sql_eval.py
 ```
 
 ### 7) Unit tests
@@ -212,8 +220,8 @@ Per-agent spans with attributes (query, doc_count, latency) exported to console 
 | `src/llm/` | Gemini + Groq routing (`get_chat_llm`, fallbacks) |
 | `src/observability/` | Structured logging + OTel tracing |
 | `src/ui/` | Gradio app with tabbed trace/observability UI |
-| `evaluation/` | Questions, metrics, batch eval, ablation, answer quality |
-| `scripts/` | `ingest.py`, `query.py`, `evaluate.py`, `ablation.py`, `answer_quality.py` |
+| `evaluation/` | Questions, metrics, batch eval, ablation, answer quality, SQL accuracy |
+| `scripts/` | `ingest.py`, `query.py`, `evaluate.py`, `ablation.py`, `answer_quality.py`, `sql_eval.py` |
 | `tests/` | Unit tests (metrics, RRF, preprocessor, SQL safety, decomposer, synthesizer) |
 | `.github/workflows/` | CI: pytest on every push / PR |
 | `Dockerfile` | Container build for deployment |
@@ -233,10 +241,15 @@ Record a short walkthrough (complex query + a failure case) and paste the link i
 ## Assignment checklist (from brief)
 
 - Data platform: ingestion + **vector (FAISS)** + **hybrid (SQL + vector + BM25)**
-- Retrieval: embeddings + similarity; bonus hybrid search + reranking
+- Retrieval: embeddings + similarity; bonus hybrid search + reranking + **metadata filtering**
 - Agents: **Planner**, **Decomposer**, **Retriever**, **Synthesizer**, **Analyst**, **Critic** (LangGraph multi-agent)
 - Query complexity: multi-hop (decomposition), aggregations (SQL-first), comparisons (decompose per entity)
-- Evaluation: **Recall@K**, **Precision@K**, **Hit@K**, **MRR@K**, **nDCG@K**, **ablation study**, **batch answer quality**
+- Evaluation:
+  - **Retrieval:** Recall@K, Precision@K, Hit@K, MRR@K, nDCG@K with **eval_mode** separation
+  - **Ablation study:** vector-only vs BM25 vs hybrid vs hybrid+CE
+  - **Answer quality:** batch critic scores (mean 4.79/5)
+  - **SQL accuracy:** reference answers for aggregation questions
+  - **Category-filtered retrieval** for fair single-category evaluation
 - Observability: structured logs with trace_id + optional LangSmith + optional OpenTelemetry
 - Deployment: Docker + Render
 

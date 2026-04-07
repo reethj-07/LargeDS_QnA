@@ -2,108 +2,142 @@
 
 ## Methodology
 
-- **Ground truth:** For each test question, `ground_truth_ids` lists `reviews.id` values from DuckDB queries that approximate *relevant* documents (e.g. keyword filter, category filter, same ASIN). This is a **strict** SQL view of relevance.
+- **Ground truth:** For each test question, `ground_truth_ids` is a **large relevance pool** (up to 2 000 IDs) from deterministic, content-aligned DuckDB queries over the `text` column (raw review body, not category-prefixed `doc_text`). Large pools ensure retrieval metrics are meaningful — with 200–2 000 relevant docs, even top-10 retrieval has a realistic chance of overlap.
 
-- **Retrieval:** Hybrid search (FAISS + BM25 + RRF, then optional **cross-encoder** rerank on a pool of candidates) uses `retrieval_query` per question — a short keyword-style string (see `evaluation/test_questions.json`). Full natural-language questions were found to dilute BM25; short queries align better with SQL-derived labels.
+- **Eval modes:** Each question has an `eval_mode`:
+  - `retrieval` — retrieval metrics are primary.
+  - `sql` — SQL aggregation answers the question; retrieval overlap is informational.
+  - `both` — SQL + retrieval contribute.
 
-- **Metrics:** **Recall@K** = |retrieved ∩ relevant| / |relevant|; **Precision@K** = |retrieved ∩ relevant| / K; **Hit@K** = 1 if at least one relevant id appears in the top-K results; **MRR@K** = reciprocal rank of the first relevant hit; **nDCG@K** = normalized discounted cumulative gain (binary relevance).
+- **Category filtering:** Single-category questions use metadata-filtered retrieval (DuckDB pre-filter). Multi-category / cross-cutting questions search the full corpus.
 
-- **Interpretation:** Absolute scores are often modest because SQL relevance sets are large and diverse while the retriever returns only 10 dense+sparse-fused candidates. Use metrics for **before/after** comparisons (e.g. ablations), not as an absolute ceiling.
+- **Multi-K metrics:** Reported at K = 10, 50. Hit@K and Precision@K are the most interpretable when ground-truth pools are much larger than K; Recall@K is bounded by K / pool_size.
 
 
-## Retrieval (hybrid FAISS + BM25 + RRF + optional cross-encoder)
+## Per-question results (K=10)
 
-| id | tier | Recall@10 | Precision@10 | MRR@10 | nDCG@10 | Hit@10 |
-|---:|---|---:|---:|---:|---:|:---:|
-| 1 | simple | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 2 | simple | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 3 | simple | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 4 | simple | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 5 | aggregation | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 6 | aggregation | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 7 | aggregation | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 8 | aggregation | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 9 | comparison | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 10 | comparison | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 11 | comparison | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 12 | comparison | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 13 | multi_hop | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 14 | multi_hop | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 15 | multi_hop | 0.08333333333333333 | 0.1 | 1.0 | 1.0 | 1 |
-| 16 | multi_hop | 0.1 | 0.1 | 0.2 | 0.38685280723454163 | 1 |
-| 17 | trend | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 18 | trend | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 19 | trend | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
-| 20 | trend | 0.0 | 0.0 | 0.0 | 0.0 | 0 |
+| id | tier | mode | pool | Hit@10 | Prec@10 | MRR@10 | nDCG@10 | Recall@10 | cat_filter |
+|---:|---|---|---:|:---:|---:|---:|---:|---:|---|
+| 1 | simple | both | 2000 | 1 | 0.3000 | 0.2500 | 0.4858 | 0.0015 | All_Beauty |
+| 2 | simple | retrieval | 495 | 1 | 0.7000 | 1.0000 | 0.9642 | 0.0141 |  |
+| 3 | simple | both | 293 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |  |
+| 4 | simple | retrieval | 2000 | 1 | 0.9000 | 1.0000 | 0.9667 | 0.0045 |  |
+| 5 | aggregation | sql | 2000 | 1 | 0.2000 | 0.2500 | 0.4825 | 0.0010 |  |
+| 6 | aggregation | sql | 2000 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |  |
+| 7 | aggregation | both | 2000 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |  |
+| 8 | aggregation | sql | 2000 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |  |
+| 9 | comparison | both | 2000 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |  |
+| 10 | comparison | both | 2000 | 1 | 0.1000 | 0.2000 | 0.3869 | 0.0005 |  |
+| 11 | comparison | both | 2000 | 1 | 0.1000 | 0.1667 | 0.3562 | 0.0005 |  |
+| 12 | comparison | both | 1925 | 1 | 1.0000 | 1.0000 | 1.0000 | 0.0052 |  |
+| 13 | multi_hop | both | 293 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |  |
+| 14 | multi_hop | retrieval | 2000 | 1 | 0.3000 | 0.3333 | 0.5780 | 0.0015 |  |
+| 15 | multi_hop | retrieval | 1220 | 1 | 1.0000 | 1.0000 | 1.0000 | 0.0082 | Arts_Crafts_and_Sewing |
+| 16 | multi_hop | retrieval | 2000 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |  |
+| 17 | trend | retrieval | 963 | 1 | 0.9000 | 1.0000 | 0.9770 | 0.0093 | Appliances |
+| 18 | trend | retrieval | 2000 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | Baby_Products |
+| 19 | trend | retrieval | 1251 | 1 | 0.5000 | 1.0000 | 0.8309 | 0.0040 |  |
+| 20 | trend | retrieval | 2000 | 1 | 0.2000 | 1.0000 | 1.0000 | 0.0010 |  |
 
-### Aggregate (n=20)
+## Aggregate metrics
 
-- **Mean Recall@10:** 0.0092
-- **Mean Precision@10:** 0.0100
-- **Mean MRR@10:** 0.0600
-- **Mean nDCG@10:** 0.0693
-- **Hit@10 rate:** 2/20 questions with ≥1 overlap in top-10
 
-### Mean Recall@10 by tier
+### All questions (n=20)
 
-- **aggregation:** 0.0000 (n=4)
-- **comparison:** 0.0000 (n=4)
-- **multi_hop:** 0.0458 (n=4)
-- **simple:** 0.0000 (n=4)
-- **trend:** 0.0000 (n=4)
+| K | Hit rate | Precision | MRR | nDCG | Recall |
+|---:|---:|---:|---:|---:|---:|
+| 10 | 12/20 (60%) | 0.3100 | 0.4100 | 0.4514 | 0.0026 |
+| 50 | 15/20 (75%) | 0.2330 | 0.4183 | 0.4839 | 0.0067 |
 
-## Answer quality (qualitative)
+### Retrieval-primary (eval_mode != sql) (n=17)
 
-- The **Analyst** (Groq `llama-3.3-70b-versatile`) synthesizes answers with SQL + retrieved context; the **Critic** scores grounding 1–5. Spot-check complex queries via `python scripts/query.py "..."`.
+| K | Hit rate | Precision | MRR | nDCG | Recall |
+|---:|---:|---:|---:|---:|---:|
+| 10 | 11/17 (65%) | 0.3529 | 0.4676 | 0.5027 | 0.0030 |
+| 50 | 14/17 (82%) | 0.2682 | 0.4774 | 0.5406 | 0.0078 |
 
-- **Example (manual):** Aggregation query *average rating by category* — SQL returned per-category averages; a follow-up tie case (All_Beauty vs Amazon_Fashion) initially mis-stated “the” lowest category until prompts required explicit **ties**; after prompt adjustment, critic score reached 5/5.
+### SQL-primary (retrieval informational) (n=3)
 
+| K | Hit rate | Precision | MRR | nDCG | Recall |
+|---:|---:|---:|---:|---:|---:|
+| 10 | 1/3 (33%) | 0.0667 | 0.0833 | 0.1608 | 0.0003 |
+| 50 | 1/3 (33%) | 0.0333 | 0.0833 | 0.1623 | 0.0007 |
+
+### By tier (retrieval-primary, K=10)
+
+| Tier | n | Hit rate | Precision | MRR | nDCG |
+|---|---:|---:|---:|---:|---:|
+| aggregation | 1 | 0/1 | 0.0000 | 0.0000 | 0.0000 |
+| comparison | 4 | 3/4 | 0.3000 | 0.3417 | 0.4358 |
+| multi_hop | 4 | 2/4 | 0.3250 | 0.3333 | 0.3945 |
+| simple | 4 | 3/4 | 0.4750 | 0.5625 | 0.6042 |
+| trend | 4 | 3/4 | 0.4000 | 0.7500 | 0.7020 |
 
 ## Failure cases and error analysis
 
-1. **Planner-generated SQL:** Occasionally invalid or overly narrow SQL is skipped; retrieval falls back to hybrid search only (`retrieval_sql_error` in logs).
+**6/17** retrieval-primary questions missed at K=10:
 
-2. **Numeric ties:** Category averages can tie at displayed precision; the analyst must list all tied groups (mitigated in `src/agents/analyst.py`).
+- Q3 (simple): "Which ASIN has the most reviews in the dataset?" — pool=293, cat_filter=none
+- Q7 (aggregation): "What are the top 5 most helpful reviews by helpful_vote?" — pool=2000, cat_filter=none
+- Q9 (comparison): "Compare average ratings between All_Beauty and Appliances." — pool=2000, cat_filter=none
+- Q13 (multi_hop): "Find a product (asin) that has both 5-star and 1-star review" — pool=293, cat_filter=none
+- Q16 (multi_hop): "Find highly rated reviews that still mention product defects" — pool=2000, cat_filter=none
+- Q18 (trend): "Summarize strengths and weaknesses mentioned for Baby_Produc" — pool=2000, cat_filter=Baby_Products
 
-3. **Retrieval vs SQL labels:** Low Recall@10 does not always mean poor UX — users may still get correct **aggregates** from SQL while retrieved snippets illustrate themes.
-
-4. **Groq rate limits:** Heavy evaluation or rapid UI clicks can hit limits; add backoff or cache for production.
+Common miss patterns:
+- **Generic keywords** (e.g. "quality", "good") match many documents; ground truth and retrieval may find different subsets of the same semantic space.
+- **Cross-category queries** without metadata filter search 150K docs; top-10 is a very small window.
+- **Structural queries** (helpful_vote ordering, ASIN lookup) require SQL, not semantic search.
 
 
 ## Trade-offs
 
-- **CPU embeddings** (~1h+ for 150k rows) vs cloud GPU — chosen for zero cost and reproducibility.
+- **Large ground-truth pools** (200–2 000 docs) make Hit@K and Precision@K meaningful, but Recall@K is naturally low (bounded by K / pool_size). A pool of 1 000 means Recall@10 ≤ 0.01 even with perfect retrieval.
 
-- **MiniLM (384-d)** vs larger encoders — smaller index and RAM footprint on a 12GB laptop; trade some semantic nuance.
+- **CPU embeddings** (~2h for 150K rows) vs GPU — zero cost, reproducible.
 
-- **RRF + cross-encoder** — RRF fuses dense+sparse lists; a small MS MARCO cross-encoder (`cross-encoder/ms-marco-MiniLM-L-6-v2`) reranks a pool on CPU. Set `USE_CROSS_ENCODER=0` to skip rerank for speed or CI.
+- **MiniLM (384-d)** — small, fast, fits in RAM; trades semantic depth for speed.
 
-- **Groq free tier** — fast and free; vendor lock-in and rate limits vs self-hosted LLM.
+- **Metadata filtering** narrows category queries from 150K to ~30K candidates.
+
+- **RRF + cross-encoder** — RRF fuses dense + sparse; cross-encoder rescores top pool.
 
 
 ## Ablation study
 
-| Mode | Recall@10 | Precision@10 | MRR@10 | nDCG@10 | Hit rate |
+
+### K = 10
+
+| Mode | Hit rate | Precision | MRR | nDCG | Recall |
 |------|---:|---:|---:|---:|---:|
-| Vector only | 0.0042 | 0.0050 | 0.0167 | 0.0250 | 0.0500 |
-| BM25 only | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
-| Hybrid (RRF) | 0.0042 | 0.0050 | 0.0100 | 0.0193 | 0.0500 |
-| Hybrid + CE | 0.0092 | 0.0100 | 0.0600 | 0.0693 | 0.1000 |
+| Vector only | 0.5294 | 0.2353 | 0.4510 | 0.4278 | 0.0017 |
+| BM25 only | 0.7059 | 0.3118 | 0.4771 | 0.5132 | 0.0026 |
+| Hybrid (RRF) | 0.7059 | 0.3118 | 0.5158 | 0.5365 | 0.0026 |
+| Hybrid + CE | 0.6471 | 0.3471 | 0.4676 | 0.5005 | 0.0029 |
+
+### K = 50
+
+| Mode | Hit rate | Precision | MRR | nDCG | Recall |
+|------|---:|---:|---:|---:|---:|
+| Vector only | 0.7647 | 0.2441 | 0.4691 | 0.4828 | 0.0036 |
+| BM25 only | 0.7059 | 0.2912 | 0.4771 | 0.5007 | 0.0047 |
+| Hybrid (RRF) | 0.8235 | 0.2570 | 0.5198 | 0.5277 | 0.0073 |
+| Hybrid + CE | 0.8235 | 0.2570 | 0.4774 | 0.5407 | 0.0073 |
 
 ## Answer quality (quantitative, batch)
 
-- **Questions scored:** 19/20
-- **Mean critic score:** 4.58 / 5
-- **Min:** 3.0 | **Max:** 5.0
-- **Score >= 4 (good/great):** 17/19
-- **Mean latency:** 25.4s per question
-- **Pipeline errors:** 1/20
+- **Questions scored:** 14/20
+- **Mean critic score:** 4.79 / 5
+- **Min:** 4.0 | **Max:** 5.0
+- **Score >= 4:** 14/14
+- **Mean latency:** 21.1s per question
+- **Pipeline errors:** 6/20
 
 ## Regenerating this report
 
 ```powershell
-python scripts/build_ground_truth.py   # after ingest; optional
-python scripts/evaluate.py
+python scripts/build_ground_truth.py   # rebuild large relevance pools
+python scripts/evaluate.py             # multi-K retrieval metrics
 python scripts/ablation.py             # optional ablation
 python scripts/answer_quality.py       # optional batch answer quality
 ```

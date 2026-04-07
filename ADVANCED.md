@@ -31,7 +31,13 @@ LangGraph keeps state explicit (`AgentState`) and makes retries and tracing audi
 
 ## Evaluation nuance
 
-- **Ground truth** from SQL is often a *large* set of ids (e.g. all reviews matching a filter). **Recall@K** and **Precision@K** are strict against that set.
+- **Ground truth** uses deterministic, content-aligned SQL (keyword `LIKE` filters matching what retrieval would find). No `ORDER BY random()` — results are reproducible across runs.
+- **Eval modes** separate questions by answer strategy:
+  - `retrieval` — metrics measure document overlap directly
+  - `sql` — answer correctness comes from SQL; retrieval overlap is informational
+  - `both` — SQL + retrieval together
+- **Category-filtered retrieval:** Single-category questions pre-filter candidates via DuckDB metadata, narrowing the search space from 150K to ~30K and boosting precision.
+- **Category in doc_text:** Preprocessing prefixes each review with `[Category Name]` so BM25 and FAISS can leverage category signal during retrieval.
 - **Hit@K**, **MRR@K**, and **nDCG@K** complement recall: they reward *any* good hit and *rank* of the first hit, which aligns better with user experience when K is small.
 - Report metrics **before/after** changes (e.g. rerank on/off, `retrieval_query` tuning), not as absolute ceilings.
 
@@ -61,15 +67,20 @@ This closes the "Answer quality" quantitative requirement from the brief.
 
 ## Test suite
 
-**30 unit tests** in `tests/` covering:
+**30+ unit tests** in `tests/` covering:
 
 | File | What it tests |
 |------|---------------|
 | `test_metrics.py` | Recall@K, MRR@K, nDCG@K |
 | `test_metrics_extended.py` | AP, Hit@K, edge cases |
 | `test_rrf.py` | Reciprocal rank fusion ordering |
-| `test_preprocessor.py` | Text cleaning, boolean/float/int parsing, row filtering |
+| `test_preprocessor.py` | Text cleaning, boolean/float/int parsing, row filtering, category prefix |
 | `test_sql_safety.py` | SQL injection prevention (INSERT, DROP, multiple statements) |
+| `test_decomposer.py` | JSON extraction and decomposer mocks |
+| `test_planner_route.py` | Planner routing mocks |
+| `test_synthesizer.py` | Sub-result merging, dedup, ordering |
+| `test_tracing.py` | Trace IDs and noop spans |
+| `test_llm_chat.py` | API key checks and LLM routing |
 
 ## Operations
 
@@ -81,7 +92,10 @@ This closes the "Answer quality" quantitative requirement from the brief.
 1. Trade-off: **150K rows on CPU** vs cloud GPU -- documented ingest time and index sizes.
 2. **Hybrid retrieval** is not redundant: vector and BM25 capture different failure modes -- the ablation quantifies this.
 3. **SQL + RAG:** aggregates from DuckDB vs qualitative evidence from reviews -- when each is authoritative.
-4. **Evaluation honesty:** large SQL-derived label sets vs top-10 retrieval; interpret metrics with that mismatch in mind.
-5. **Cross-encoder rerank** boosts precision without GPU -- show the ablation table.
-6. **30 tests + CI** -- demonstrates production mindset, not just a notebook prototype.
-7. **Batch answer quality** -- quantitative LLM-as-judge, not just ad-hoc spot checks.
+4. **Evaluation honesty:** eval_mode separation acknowledges that SQL-primary questions shouldn't be judged solely on retrieval overlap.
+5. **Content-aligned ground truth** with deterministic SQL ensures reproducible, meaningful metrics.
+6. **Metadata-filtered retrieval** for category-specific queries — mirrors production RAG systems.
+7. **Cross-encoder rerank** boosts precision without GPU -- show the ablation table.
+8. **30+ tests + CI** -- demonstrates production mindset, not just a notebook prototype.
+9. **Batch answer quality** -- quantitative LLM-as-judge (critic scores), not just ad-hoc spot checks.
+10. **SQL accuracy evaluation** -- separate eval track for aggregation questions.

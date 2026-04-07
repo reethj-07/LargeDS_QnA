@@ -56,16 +56,30 @@ class HybridRetriever:
         use_bm25: bool = True,
         *,
         use_cross_encoder: bool | None = None,
+        allowed_ids: set[int] | None = None,
     ) -> list[tuple[int, float]]:
+        """Hybrid search with optional post-filter by allowed_ids (metadata filtering).
+
+        When *allowed_ids* is given, only documents whose id is in that set are
+        retained.  Upstream candidates are over-fetched (3× top_k) so that the
+        final list still reaches *top_k* after filtering.
+        """
         top_k = top_k or FINAL_TOP_K
+        fetch_k = VECTOR_TOP_K if allowed_ids is None else max(VECTOR_TOP_K, top_k * 3)
+        bm25_k = BM25_TOP_K if allowed_ids is None else max(BM25_TOP_K, top_k * 3)
+
         lists: list[list[tuple[int, float]]] = []
         if use_vector:
-            lists.append(self.vector_search(query, VECTOR_TOP_K))
+            lists.append(self.vector_search(query, fetch_k))
         if use_bm25:
-            lists.append(self.keyword_search(query, BM25_TOP_K))
+            lists.append(self.keyword_search(query, bm25_k))
         if not lists:
             return []
         merged = reciprocal_rank_fusion(lists, k=RRF_K)
+
+        if allowed_ids is not None:
+            merged = [(doc_id, s) for doc_id, s in merged if doc_id in allowed_ids]
+
         ce = USE_CROSS_ENCODER if use_cross_encoder is None else use_cross_encoder
         if not ce:
             return merged[:top_k]
@@ -105,9 +119,14 @@ class HybridRetriever:
         top_k: int | None = None,
         use_vector: bool = True,
         use_bm25: bool = True,
+        *,
+        allowed_ids: set[int] | None = None,
     ) -> tuple[list[dict[str, Any]], list[tuple[int, float]]]:
         """Return documents (with text) and id-score pairs."""
-        ranked = self.hybrid_search(query, top_k=top_k, use_vector=use_vector, use_bm25=use_bm25)
+        ranked = self.hybrid_search(
+            query, top_k=top_k, use_vector=use_vector, use_bm25=use_bm25,
+            allowed_ids=allowed_ids,
+        )
         ids = [i for i, _ in ranked]
         cache = getattr(self, "_last_fetched", {})
         if cache and all(i in cache for i in ids):
@@ -118,3 +137,12 @@ class HybridRetriever:
 
     def sql_query(self, sql: str) -> list[dict[str, Any]]:
         return self.sql_store.query_safe(sql)
+
+    def get_ids_for_category(self, category: str) -> set[int]:
+        """Return all review ids that belong to *category* (for metadata filtering)."""
+        con = self.sql_store.connect()
+        safe = category.replace("'", "''")
+        rows = con.execute(
+            f"SELECT id FROM reviews WHERE category = '{safe}'"
+        ).fetchall()
+        return {int(r[0]) for r in rows}

@@ -74,6 +74,10 @@ The Planner classifies each query and assigns a **route**:
 - **Docker**: `docker build -t bigdata-qna . && docker run -p 7860:7860 --env-file .env bigdata-qna`
 - **Render**: push repo, Render auto-detects `render.yaml` (Docker service with persistent disk for data)
 
+## Metadata-filtered retrieval
+
+Category-specific queries can leverage DuckDB metadata to pre-filter candidates before FAISS/BM25 search. The `HybridRetriever.hybrid_search()` accepts an `allowed_ids` parameter that restricts results to a given document set, and `get_ids_for_category()` provides category-level filtering. This narrows the search space from 150K to ~30K documents per category, significantly improving precision.
+
 ## Security
 
 - `SqlStore.query_safe` allows only single-statement `SELECT` on `reviews` (no DDL/DML).

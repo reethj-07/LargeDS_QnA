@@ -60,15 +60,18 @@ def preprocess_records(
     for i, r in enumerate(raw_rows):
         title = clean_text(r.get("title"))
         body = clean_text(r.get("text"))
-        doc_text = f"{title} {body}".strip()
-        if not doc_text:
+        content = f"{title} {body}".strip()
+        if not content:
             continue
+        cat = str(r.get("_category") or "unknown")
+        cat_label = cat.replace("_", " ")
+        doc_text = f"[{cat_label}] {content}"
         vp = parse_bool(r.get("verified_purchase"))
         out.append(
             {
                 "id": start_id + i,
                 "asin": str(r.get("asin") or r.get("parent_asin") or "")[:32],
-                "category": str(r.get("_category") or "unknown"),
+                "category": cat,
                 "rating": parse_float(r.get("rating")),
                 "title": title,
                 "text": body,

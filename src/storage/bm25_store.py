@@ -55,13 +55,15 @@ class BM25Store:
         if self._bm25 is None:
             raise RuntimeError("BM25 not loaded.")
         q = tokenize(query)
+        if not q:
+            return []
         scores = self._bm25.get_scores(q)
         scores = np.asarray(scores, dtype=np.float64)
         n = min(top_k, int(scores.size))
         if n <= 0:
             return []
         idxs = np_argsort_topk(scores, n)
-        return [(self._id_map[i], float(scores[i])) for i in idxs]
+        return [(self._id_map[i], float(scores[i])) for i in idxs if scores[i] > 0]
 
 
 def np_argsort_topk(scores: Any, k: int) -> list[int]:

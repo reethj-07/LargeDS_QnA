@@ -115,9 +115,14 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    TQ[test_questions.json 20 Qs] --> EV[evaluate.py]
-    EV --> HS[Hybrid search per question]
-    HS --> MET[Recall / Precision / MRR / nDCG / Hit]
+    TQ[test_questions.json 20 Qs] --> BGT[build_ground_truth.py]
+    BGT --> |deterministic content-aligned SQL| GT[Ground truth IDs + eval_mode]
+    GT --> EV[evaluate.py]
+    EV --> |category filtering| CF{Single category?}
+    CF -->|yes| MF[Metadata-filtered retrieval]
+    CF -->|no| HS[Full hybrid search]
+    MF --> MET[Recall / Precision / MRR / nDCG / Hit]
+    HS --> MET
     MET --> RES[eval_results.json]
     RES --> RG[report_generator.py]
     RG --> MD[EVALUATION_REPORT.md]
@@ -130,4 +135,8 @@ flowchart TD
     AQ --> PIPE[Full agent pipeline × 20]
     PIPE --> CRI[Critic scores + latency]
     CRI --> AQR[answer_quality.json]
+
+    GT --> SE[sql_eval.py]
+    SE --> |aggregation Qs| SQL[SQL accuracy reference]
+    SQL --> SER[sql_eval.json]
 ```
