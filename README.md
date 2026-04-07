@@ -10,7 +10,7 @@ AI **multi-agent** pipeline over **150K+ Amazon product reviews** (McAuley-Lab `
 | **Access** | Raw JSONL files under `raw/review_categories/*.jsonl` via `huggingface_hub.hf_hub_download` (the `datasets` Python API does not load this repo due to deprecated loading scripts). |
 | **Subset used** | 5 categories x 30,000 reviews = **150,000 rows**: All_Beauty, Appliances, Amazon_Fashion, Arts_Crafts_and_Sewing, Baby_Products |
 | **Fields stored** | `id`, `asin`, `category`, `rating`, `title`, `text`, `doc_text`, `timestamp`, `helpful_vote`, `verified_purchase` |
-| **Preprocessing** | Normalize Unicode (NFKC), strip HTML-like tags, build `doc_text = title + " " + text`, coerce `verified_purchase` to bool, drop empty rows |
+| **Preprocessing** | Normalize Unicode (NFKC), strip HTML-like tags, build `doc_text = "[Category] " + title + " " + text` (category prefix boosts BM25/FAISS category signal), coerce `verified_purchase` to bool, drop empty rows |
 | **Artifacts** | Parquet (`data/processed/`), DuckDB + FAISS + BM25 (`data/indices/`) -- large files gitignored; rebuild with `python scripts/ingest.py` |
 
 ## Requirements

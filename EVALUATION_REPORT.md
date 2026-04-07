@@ -73,6 +73,18 @@
 | simple | 4 | 3/4 | 0.4750 | 0.5625 | 0.6042 |
 | trend | 4 | 3/4 | 0.4000 | 0.7500 | 0.7020 |
 
+## Key insights
+
+1. **Hybrid retrieval outperforms either modality alone.** At K=50, Hybrid (RRF) achieves 82% Hit rate vs 76% vector-only and 71% BM25-only. The fusion captures both semantic similarity and exact keyword matches.
+
+2. **Category-filtered retrieval is critical for single-category questions.** Questions like Q15 (Arts_Crafts_and_Sewing shipping damage) and Q17 (1-star Appliances themes) achieve near-perfect precision when metadata filtering narrows candidates from 150K to ~30K.
+
+3. **SQL-primary questions should not be judged on retrieval overlap.** The `eval_mode` separation reveals that SQL-primary questions (Q5, Q6, Q8) naturally score low on retrieval metrics because their ground truth is best answered by aggregation, not document lookup. Separating these prevents misleading aggregate scores.
+
+4. **Cross-encoder reranking improves precision but not always Hit rate.** The ablation shows Hybrid+CE has higher Precision@10 (0.347 vs 0.312) and nDCG@50 (0.541 vs 0.528) compared to plain Hybrid, but identical Hit@50. The cross-encoder reorders the top of the list rather than introducing new documents.
+
+5. **Answer quality is high despite retrieval imperfections.** The agent pipeline achieves 4.79/5 mean critic score across 14 scored questions, with 100% scoring >= 4. The multi-agent design (SQL fallback, decomposition, retry loop) compensates for retrieval misses.
+
 ## Failure cases and error analysis
 
 **6/17** retrieval-primary questions missed at K=10:
