@@ -20,13 +20,14 @@ _FORBIDDEN = re.compile(
 
 
 class SqlStore:
-    def __init__(self, db_path: Path) -> None:
+    def __init__(self, db_path: Path, *, read_only: bool = False) -> None:
         self.db_path = db_path
+        self._read_only = read_only
         self._conn: duckdb.DuckDBPyConnection | None = None
 
     def connect(self) -> duckdb.DuckDBPyConnection:
         if self._conn is None:
-            self._conn = duckdb.connect(str(self.db_path))
+            self._conn = duckdb.connect(str(self.db_path), read_only=self._read_only)
         return self._conn
 
     def close(self) -> None:

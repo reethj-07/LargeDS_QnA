@@ -97,6 +97,10 @@ Run all 20 test questions through the full agent pipeline, collect critic scores
 python scripts/answer_quality.py
 ```
 
+Uses **read-only** DuckDB so this can run while the Gradio UI (or another job) has the database open. The script sets **`USE_CROSS_ENCODER=0`** by default (same as CI) so the cross-encoder is not loaded once per query.
+
+On **Groq only**, analyst and critic default to **`llama-3.1-8b-instant`** for this script so a full 20-question batch stays within the free tier **tokens-per-day** limit for `llama-3.3-70b-versatile`. To force **70B** for analyst/critic (higher quality, may hit TPD): `set ANSWER_QUALITY_USE_70B=1` or add **`--use-70b`** to the command line. With **Gemini** as primary (`GEMINI_API_KEY` set), Groq model envs apply mainly to fallback.
+
 ### 6b) SQL accuracy (aggregation questions)
 
 Generate reference answers for SQL-primary questions:
@@ -117,9 +121,17 @@ CI (`.github/workflows/ci.yml`) runs tests with `USE_CROSS_ENCODER=0`.
 
 ### 8) Submission
 
+**Assignment steps (you complete on GitHub / Google / recording):**
+
 - [ ] Repo **public** *or* **private** with collaborator `uptiq-chaitanya` (read) per assignment.
 - [ ] Submit **Google Form** with repo link: [forms.gle/9iPeUBHKcdHhuSq67](https://forms.gle/9iPeUBHKcdHhuSq67).
-- [ ] Record **demo video** (complex query + failure case) when ready -- link in **`DEMO_VIDEO/README.md`**.
+- [ ] Record **demo video** (complex query + failure case) when ready -- paste the URL in **`DEMO_VIDEO/README.md`** under **Demo URL**.
+
+**Repo evaluation artifacts (regenerate anytime):**
+
+- [x] `evaluation/cache/eval_results.json`, `ablation.json`, and `answer_quality.json` are populated; **`EVALUATION_REPORT.md`** is generated from them via `python scripts/evaluate.py` (includes report) or `python -m evaluation.report_generator` after ablation/answer-quality runs.
+
+*(After you finish each assignment step above, change its `[ ]` to `[x]`.)*
 
 ## Multi-agent architecture
 
@@ -139,14 +151,16 @@ User Query
     +-- "decompose" --> [Decomposer] --> [Sub-Retriever] --> [Synthesizer] --+
 ```
 
-| Agent | Model | Role |
-|-------|-------|------|
-| **Planner** | llama-3.1-8b-instant | Classify query, decide route, generate SQL hint |
-| **Decomposer** | llama-3.1-8b-instant | Break multi-hop / comparison queries into sub-questions |
-| **Retriever** | -- | Hybrid search (FAISS + BM25 + RRF + cross-encoder) |
+| Agent | Model (primary / fallback) | Role |
+|-------|---------------------------|------|
+| **Planner** | `MODEL_GEMINI_PLANNER` (default `gemini-2.5-flash`) / `MODEL_PLANNER` (Groq `llama-3.1-8b-instant`) | Classify query, route, SQL hint, optional **category_filter** for retrieval |
+| **Decomposer** | Same stack as Planner | Break multi-hop / comparison queries into sub-questions |
+| **Retriever** | -- | Hybrid search (FAISS + BM25 + RRF + optional cross-encoder); respects planner **category_filter** |
 | **Synthesizer** | -- | Merge per-sub-question retrieval results |
-| **Analyst** | llama-3.3-70b-versatile | Generate grounded answer with citations |
-| **Critic** | llama-3.3-70b-versatile | Score answer quality, trigger retry if needed |
+| **Analyst** | `MODEL_GEMINI_ANALYST` (default `gemini-2.5-pro`) / `MODEL_ANALYST` (Groq `llama-3.3-70b-versatile`) | Grounded answer with citations |
+| **Critic** | `MODEL_GEMINI_CRITIC` (default `gemini-2.5-flash`) / `MODEL_CRITIC` (Groq `llama-3.3-70b-versatile`) | Score quality, trigger retry |
+
+When `GEMINI_API_KEY` or `GOOGLE_API_KEY` is set and `LLM_PRIMARY` is not `groq`, **Gemini** is used first; **Groq** is the fallback on errors/rate limits. With no Gemini key, **Groq only**. See `src/llm/chat.py`.
 
 ## Deployment
 

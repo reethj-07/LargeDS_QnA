@@ -31,7 +31,7 @@ def main() -> None:
 
     import duckdb
 
-    con = duckdb.connect(str(DUCKDB_PATH))
+    con = duckdb.connect(str(DUCKDB_PATH), read_only=True)
 
     def ids(sql: str, cap: int = POOL_CAP) -> list[int]:
         rows = con.execute(sql).fetchall()

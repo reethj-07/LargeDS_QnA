@@ -1,5 +1,7 @@
 # Demo Video
 
+**Where to put your link:** Edit this file and replace the placeholder on the line **`Demo URL:`** in the [Demo URL](#demo-url) section below (same place the assignment README points to). Use a Loom, YouTube (unlisted), Google Drive share link, or any URL graders can open.
+
 **Status:** Record when ready.
 
 Record a **Loom** or local MP4 showing the following three scenarios:
@@ -37,4 +39,6 @@ Record a **Loom** or local MP4 showing the following three scenarios:
 
 ## Demo URL
 
-- Demo URL: _add your link_
+Paste your recording here (this is the link reviewers open):
+
+- **Demo URL:** _add your link here_

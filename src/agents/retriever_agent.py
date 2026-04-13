@@ -16,6 +16,8 @@ def run_retrieval(
     search_query: str,
     sql_suggestion: str,
     trace: list[str],
+    *,
+    category_filter: str | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[tuple[int, float]], str]:
     sql_results: list[dict[str, Any]] = []
     if sql_suggestion and sql_suggestion.strip():
@@ -28,7 +30,11 @@ def run_retrieval(
             log_event("retrieval_sql_error", {"error": str(e)})
 
     sq = search_query.strip() or query
-    docs, ranked, bundle = retrieve_bundle(hybrid, sq, top_k=FINAL_TOP_K)
+    if category_filter:
+        trace.append(f"Category filter (retrieval): {category_filter}")
+    docs, ranked, bundle = retrieve_bundle(
+        hybrid, sq, top_k=FINAL_TOP_K, category_filter=category_filter
+    )
     trace.append(f"Hybrid retrieval: {len(docs)} docs")
     doc_ids = [d.get("id") for d in docs[:30]]
     scores = [float(s) for _, s in ranked[:30]]

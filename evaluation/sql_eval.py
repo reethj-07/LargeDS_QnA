@@ -113,7 +113,7 @@ def run_sql_eval(out_path: Path) -> list[dict]:
         sys.exit(1)
 
     import duckdb
-    con = duckdb.connect(str(DUCKDB_PATH))
+    con = duckdb.connect(str(DUCKDB_PATH), read_only=True)
 
     cases = _sql_test_cases(con)
     con.close()

@@ -31,6 +31,7 @@ DEFAULT_CATEGORIES: list[tuple[str, str]] = [
     ("Arts_Crafts_and_Sewing", "Arts_Crafts_and_Sewing.jsonl"),
     ("Baby_Products", "Baby_Products.jsonl"),
 ]
+REVIEW_CATEGORY_NAMES: frozenset[str] = frozenset(c[0] for c in DEFAULT_CATEGORIES)
 ROWS_PER_CATEGORY = 30_000
 
 # Embeddings

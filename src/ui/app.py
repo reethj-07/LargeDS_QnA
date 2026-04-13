@@ -43,7 +43,10 @@ def run_once(message: str) -> tuple[str, str, str, str, list[list]]:
     # -- Query type badge --
     qt = out.get("query_type", "unknown")
     route = out.get("route", "direct")
+    cf = (out.get("category_filter") or "").strip()
     badge = f"Type: {qt}  |  Route: {route}  |  {elapsed:.1f}s"
+    if cf:
+        badge += f"  |  Retrieval category: {cf}"
 
     # -- Sub-questions --
     subs = out.get("sub_questions") or []
@@ -94,7 +97,7 @@ def build_demo() -> gr.Blocks:
             "# E-commerce Analytics Agent\n"
             "**150K Amazon reviews** | **FAISS + BM25 + Cross-encoder** | "
             "**Multi-agent: Planner -> Router -> [Decompose|SQL-first|Direct] -> Analyst -> Critic** "
-            "(LangGraph + Groq)\n\n"
+            "(LangGraph; Gemini when configured, else Groq)\n\n"
             "Type a question or pick an example below."
         )
 

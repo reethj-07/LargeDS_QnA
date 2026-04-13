@@ -19,14 +19,34 @@ from src.observability.logger import log_event
 from src.observability.tracing import new_trace_id, span
 from src.retrieval.hybrid_retriever import HybridRetriever
 
+# Bound analyst prompt size (Groq 8b free tier: ~6k input tokens/request on many accounts).
+_MAX_ANALYST_CONTEXT_CHARS = 5_500
+_MAX_EVIDENCE_FOR_CRITIC = 6_000
+
+
+def _shrink_cell(val: Any, max_str: int = 240) -> Any:
+    if isinstance(val, str) and len(val) > max_str:
+        return val[:max_str] + "…"
+    return val
+
 
 def _sql_block(rows: list[dict[str, Any]]) -> str:
+    """Compact SQL rows for LLM prompts (avoid 413 / token overflow on wide SELECT *)."""
     if not rows:
         return "(none)"
+    slim: list[dict[str, Any]] = []
+    for r in rows[:24]:
+        if not isinstance(r, dict):
+            slim.append({"_value": _shrink_cell(r)})
+            continue
+        slim.append({k: _shrink_cell(v) for k, v in r.items()})
     try:
-        return json.dumps(rows[:200], indent=2, default=str)[:20000]
+        s = json.dumps(slim, indent=2, default=str)
+        if len(s) > 4500:
+            s = s[:4500] + "\n… (truncated)"
+        return s
     except Exception:
-        return str(rows)[:20000]
+        return str(slim)[:4500]
 
 
 def build_graph(hybrid: HybridRetriever):
@@ -40,6 +60,7 @@ def build_graph(hybrid: HybridRetriever):
             log_event("agent_planner", {
                 "query_type": p.get("query_type"),
                 "route": route,
+                "category_filter": (p.get("category_filter") or "") or None,
             })
             return {
                 "query_type": str(p.get("query_type", "multi_hop")),
@@ -47,6 +68,7 @@ def build_graph(hybrid: HybridRetriever):
                 "plan": str(p.get("plan", "")),
                 "sql_suggestion": str(p.get("sql_suggestion", "")),
                 "search_query": str(p.get("search_query", q)),
+                "category_filter": str(p.get("category_filter", "")),
                 "agent_trace": trace,
             }
 
@@ -74,20 +96,23 @@ def build_graph(hybrid: HybridRetriever):
                 log_event("retrieval_sql_first_error", {"error": str(e)})
 
         sq = state.get("search_query", state["query"])
+        cf = (state.get("category_filter") or "").strip() or None
         from src.agents.tools import retrieve_bundle
-        docs, ranked, bundle = retrieve_bundle(hybrid, sq, top_k=FINAL_TOP_K)
+        docs, ranked, bundle = retrieve_bundle(
+            hybrid, sq, top_k=FINAL_TOP_K, category_filter=cf
+        )
         trace.append(f"Supplementary retrieval: {len(docs)} docs")
 
-        ev_parts = [bundle[:8000]]
+        ev_parts = [bundle[:5000]]
         if sql_results:
-            ev_parts.append(_sql_block(sql_results)[:4000])
+            ev_parts.append(_sql_block(sql_results)[:3500])
 
         return {
             "retrieved_docs": docs,
             "sql_results": sql_results,
             "retrieval_scores": ranked,
-            "_context_bundle": bundle,
-            "_evidence_summary": "\n".join(ev_parts),
+            "_context_bundle": bundle[:_MAX_ANALYST_CONTEXT_CHARS],
+            "_evidence_summary": "\n".join(ev_parts)[:_MAX_EVIDENCE_FOR_CRITIC],
             "agent_trace": trace,
         }
 
@@ -112,6 +137,7 @@ def build_graph(hybrid: HybridRetriever):
     def sub_retrieve(state: AgentState) -> dict[str, Any]:
         subs = state.get("sub_questions") or [state["query"]]
         sql = state.get("sql_suggestion", "")
+        cf = (state.get("category_filter") or "").strip() or None
         sub_answers: list[dict[str, Any]] = []
         trace: list[str] = []
 
@@ -123,6 +149,7 @@ def build_graph(hybrid: HybridRetriever):
                 sq,
                 sql if i == 0 else "",  # only run SQL on first sub-question
                 t,
+                category_filter=cf,
             )
             sub_answers.append({
                 "question": sq,
@@ -134,17 +161,18 @@ def build_graph(hybrid: HybridRetriever):
             trace.extend([f"SQ{i+1}: " + line for line in t])
 
         merged_docs, merged_sql, merged_ranked, unified = merge_sub_results(sub_answers)
-        ev_parts = [unified[:12000]]
+        ucap = unified[:_MAX_ANALYST_CONTEXT_CHARS]
+        ev_parts = [ucap]
         if merged_sql:
-            ev_parts.append(_sql_block(merged_sql)[:4000])
+            ev_parts.append(_sql_block(merged_sql)[:3500])
 
         return {
             "sub_answers": sub_answers,
             "retrieved_docs": merged_docs,
             "sql_results": merged_sql,
             "retrieval_scores": merged_ranked,
-            "_context_bundle": unified,
-            "_evidence_summary": "\n".join(ev_parts),
+            "_context_bundle": ucap,
+            "_evidence_summary": "\n".join(ev_parts)[:_MAX_EVIDENCE_FOR_CRITIC],
             "agent_trace": trace,
         }
 
@@ -159,23 +187,26 @@ def build_graph(hybrid: HybridRetriever):
         else:
             search_q = base_sq
 
+        cf = (state.get("category_filter") or "").strip() or None
         docs, sql_results, ranked, bundle = run_retrieval(
             hybrid,
             state["query"],
             search_q,
             state.get("sql_suggestion", ""),
             trace,
+            category_filter=cf,
         )
-        ev_parts = [bundle[:8000]]
+        bc = bundle[:_MAX_ANALYST_CONTEXT_CHARS]
+        ev_parts = [bc[:5000]]
         if sql_results:
-            ev_parts.append(_sql_block(sql_results)[:4000])
+            ev_parts.append(_sql_block(sql_results)[:3500])
 
         return {
             "retrieved_docs": docs,
             "sql_results": sql_results,
             "retrieval_scores": ranked,
-            "_context_bundle": bundle,
-            "_evidence_summary": "\n".join(ev_parts),
+            "_context_bundle": bc,
+            "_evidence_summary": "\n".join(ev_parts)[:_MAX_EVIDENCE_FOR_CRITIC],
             "agent_trace": trace,
         }
 
@@ -183,15 +214,16 @@ def build_graph(hybrid: HybridRetriever):
     def analyst(state: AgentState) -> dict[str, Any]:
         with span("analyst", {"query": state["query"][:200]}):
             sql_b = _sql_block(state.get("sql_results", []))
-            ctx = state.get("_context_bundle", "")
-            ans = run_analyst(state["query"], state.get("plan", ""), sql_b, ctx)
+            ctx = (state.get("_context_bundle") or "")[:_MAX_ANALYST_CONTEXT_CHARS]
+            plan_s = (state.get("plan") or "")[:2200]
+            ans = run_analyst(state["query"], plan_s, sql_b, ctx)
             log_event("agent_analyst", {"answer_len": len(ans)})
             return {"answer": ans, "agent_trace": [f"Analyst: answer_len={len(ans)}"]}
 
     # ── Critic ───────────────────────────────────────────────────
     def critic(state: AgentState) -> dict[str, Any]:
         with span("critic", {"query": state["query"][:200]}):
-            ev = state.get("_evidence_summary", "")
+            ev = (state.get("_evidence_summary") or "")[:_MAX_EVIDENCE_FOR_CRITIC]
             score, critique, needs = run_critic(state["query"], state.get("answer", ""), ev)
             trace = [f"Critic: score={score:.2f}; needs_retry={needs}"]
             log_event("agent_critic", {"score": score, "needs_retry": needs})

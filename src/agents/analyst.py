@@ -6,6 +6,9 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from src.llm.chat import get_chat_llm, require_any_llm_key
 
+# Hard cap total user message chars (Groq 8b free tier ~6k input tokens; system prompt adds overhead).
+_MAX_ANALYST_HUMAN_CHARS = 7_200
+
 
 SYSTEM = """You are an analyst answering questions using ONLY the provided evidence:
 (1) SQL result rows if any,
@@ -42,6 +45,8 @@ SQL results (if any):
 Retrieved reviews:
 {context_block}
 """
+    if len(human) > _MAX_ANALYST_HUMAN_CHARS:
+        human = human[:_MAX_ANALYST_HUMAN_CHARS] + "\n… [truncated for API limits]"
     msg = llm.invoke(
         [
             SystemMessage(content=SYSTEM),

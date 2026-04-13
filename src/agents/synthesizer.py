@@ -37,12 +37,12 @@ def merge_sub_results(
         if sql_rows:
             all_sql.extend(sql_rows)
             ctx_parts.append(
-                "SQL results:\n" + json.dumps(sql_rows[:50], indent=2, default=str)[:4000]
+                "SQL results:\n" + json.dumps(sql_rows[:12], indent=2, default=str)[:2800]
             )
 
         bundle = sa.get("bundle", "")
         if bundle:
-            ctx_parts.append(bundle[:6000])
+            ctx_parts.append(bundle[:3500])
 
         ctx_parts.append("")
 

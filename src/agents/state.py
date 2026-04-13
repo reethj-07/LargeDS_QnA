@@ -13,6 +13,7 @@ class AgentState(TypedDict, total=False):
     route: str  # "direct" | "decompose" | "sql_first"
     sql_suggestion: str
     search_query: str
+    category_filter: str  # "" or one of REVIEW_CATEGORY_NAMES — metadata filter for retrieval
 
     # Sub-question decomposition (multi-hop / comparison)
     sub_questions: list[str]

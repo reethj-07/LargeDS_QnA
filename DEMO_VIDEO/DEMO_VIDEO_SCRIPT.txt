@@ -1,0 +1,166 @@
+================================================================================
+BIG DATA Q&A — DEMO VIDEO SCRIPT (narration + workflow)
+================================================================================
+Target length: under 5 minutes. Speak clearly; pause when the UI is loading.
+
+Before you record:
+- Indices built (or run a short ingest smoke test first so you can show it briefly).
+- .env has GROQ_API_KEY (and optionally Gemini). For a smooth demo, LLM_PRIMARY=groq avoids rate limits.
+- Terminal + browser ready; resolution 1080p+; close unrelated tabs.
+
+Paste your Loom / video link in DEMO_VIDEO/README.md when done.
+
+================================================================================
+OPENING (15–30 seconds)
+================================================================================
+
+Say:
+"Hi, this is my Large Dataset Q&A project — an e-commerce analytics agent over about
+one hundred fifty thousand Amazon product reviews from five categories on Hugging Face.
+
+I'll show ingestion briefly, then a complex multi-step query in the UI with the agent
+trace and retrieved documents, then a failure case where the system degrades gracefully,
+and optionally a quick look at evaluation."
+
+================================================================================
+SCENE 1 — DATA INGESTION (brief, ~45–60 seconds)
+================================================================================
+
+Do:
+- Open terminal in repo root, venv activated.
+- Either show ingest running OR scroll terminal history / point at data folder note in README.
+
+If showing live (smoke test is enough for video):
+  python scripts/ingest.py --rows-per-category 100
+
+Say while it runs or while you point at output:
+"This is the ingestion pipeline. It downloads JSONL shards from the Hugging Face Hub,
+normalizes text, writes Parquet and DuckDB, and builds three retrieval layers: FAISS
+for dense vectors, BM25 for keywords, and DuckDB for SQL. For the full assignment I
+use five categories times thirty thousand rows each — one hundred fifty thousand
+reviews total; for a quick demo you might use a smaller row count. The large artifacts
+stay on disk and are gitignored."
+
+================================================================================
+SCENE 2 — COMPLEX QUERY (main demo, ~2–2.5 minutes)
+================================================================================
+
+Do:
+- python -m src.ui.app
+- Open the printed URL (usually localhost 7860).
+
+Say:
+"Now I start the Gradio UI. This is the full multi-agent stack: Planner, optional
+Decomposer, hybrid retrieval, Analyst, and Critic, orchestrated with LangGraph."
+
+Type one of these (pick one you like):
+
+Option A (comparison + theme):
+"Compare average ratings between All_Beauty and Appliances."
+
+Option B (multi-hop / retrieval + reasoning, from the guide):
+"Find highly rated reviews that still mention product defects."
+
+Option C (heavier, if your machine is fast):
+"Compare average ratings across categories and name one theme from reviews in the lowest-rated category."
+
+While it runs, say:
+"The Planner classifies the query and picks a route — direct retrieval, SQL-first for
+aggregations, or decompose for comparisons and multi-hop questions. If it decomposes,
+you'll see sub-questions in the Agent Trace."
+
+After answer appears:
+1) Answer tab — Say:
+"Here's the grounded answer. Notice citations like bracket id equals review id bracket
+so every claim ties back to a specific row."
+
+2) Agent Trace tab — Say:
+"In the trace I can see the route — for example decompose with sub-questions, or
+sql first for counts and averages — plus the analyst step and the critic. The critic
+scores grounding from one to five; we use that for quality control and optional retry."
+
+3) Retrieved Documents tab — Say:
+"These snippets come from hybrid search: dense similarity plus BM25, fused with
+reciprocal rank fusion, then optional cross-encoder reranking. That combination handles
+both paraphrases and exact keywords."
+
+Closing line for this scene:
+"So the pipeline is: plan and route, retrieve with SQL and or hybrid search, synthesize
+when needed, answer with citations, then critique."
+
+================================================================================
+SCENE 3 — FAILURE CASE (~60–90 seconds)
+================================================================================
+
+Do:
+- New query in the same UI (or clear and re-ask).
+
+Use one of these:
+
+Query 1:
+"What is the revenue by product?"
+
+Say:
+"This asks for revenue, but our schema is reviews — ratings, text, ASIN, category —
+not financial revenue. The planner should avoid bogus SQL or the SQL path should fail
+safely; retrieval may still return something, but the critic should flag weak or
+ungrounded answers."
+
+Query 2:
+"List all reviews from a discontinued brand."
+
+Say:
+"We don't have a reliable discontinued-brand field. The query is vague. Watch the
+trace: either no useful SQL, or generic retrieval, and the critic score or the
+wording should reflect uncertainty rather than fabricating data."
+
+Point at:
+- Any SQL error or empty result in trace if visible.
+- Critic score or disclaimer in the answer.
+
+Say:
+"This is intentional: the assignment asked for failure analysis. The system is designed
+to degrade gracefully — structured logs, no silent hallucination of missing columns."
+
+================================================================================
+SCENE 4 — EVALUATION (optional, ~45–60 seconds)
+================================================================================
+
+Do:
+- Terminal: python scripts/evaluate.py   (or show recent output)
+- Open EVALUATION_REPORT.md in the editor
+
+Say:
+"For evaluation I use twenty labeled questions. Ground truth is built with deterministic
+SQL over the review text — not random IDs — so metrics are reproducible.
+
+We report Hit at K, precision, MRR, nDCG, and recall at multiple K values. Questions
+have an eval mode: retrieval-primary, SQL-primary, or both, so we don't unfairly
+penalize aggregation questions that are really answered by DuckDB, not semantic search.
+
+The report also includes an ablation — vector only, BM25 only, hybrid RRF, hybrid plus
+cross-encoder — and batch answer quality from the critic. That covers both retrieval
+quality and end-to-end answer quality."
+
+================================================================================
+CLOSING (15–20 seconds)
+================================================================================
+
+Say:
+"That's the end-to-end system: data platform with vector and SQL, hybrid retrieval,
+multi-agent reasoning with observability, and quantitative evaluation. Thanks for watching."
+
+================================================================================
+QUICK REFERENCE — COMMANDS
+================================================================================
+
+  python scripts/ingest.py
+  python scripts/ingest.py --rows-per-category 100
+
+  python -m src.ui.app
+
+  python scripts/evaluate.py
+  (optional) python scripts/ablation.py
+  (optional) python scripts/answer_quality.py
+
+================================================================================

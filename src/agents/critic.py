@@ -47,7 +47,7 @@ Proposed answer:
 {answer}
 
 Evidence available (excerpt):
-{evidence_summary[:12000]}
+{evidence_summary[:6000]}
 """
     msg = llm.invoke(
         [

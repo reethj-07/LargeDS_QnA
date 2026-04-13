@@ -62,3 +62,47 @@ def test_planner_derives_decompose_for_multi_hop(mock_get_llm):
     from src.agents.planner import run_planner
     result = run_planner("Compare themes across categories")
     assert result["route"] == "decompose"
+
+
+@patch("src.agents.planner.get_chat_llm")
+def test_planner_normalizes_unknown_category_filter(mock_get_llm):
+    payload = {
+        "query_type": "factual",
+        "plan": "1) search",
+        "sql_suggestion": "",
+        "search_query": "q",
+        "route": "direct",
+        "category_filter": "NotARealCategory",
+    }
+    mock_msg = MagicMock()
+    mock_msg.content = json.dumps(payload)
+    mock_llm = MagicMock()
+    mock_llm.invoke.return_value = mock_msg
+    mock_get_llm.return_value = mock_llm
+
+    from src.agents.planner import run_planner
+
+    result = run_planner("test")
+    assert result["category_filter"] == ""
+
+
+@patch("src.agents.planner.get_chat_llm")
+def test_planner_keeps_valid_category_filter(mock_get_llm):
+    payload = {
+        "query_type": "factual",
+        "plan": "1) search",
+        "sql_suggestion": "",
+        "search_query": "q",
+        "route": "direct",
+        "category_filter": "Appliances",
+    }
+    mock_msg = MagicMock()
+    mock_msg.content = json.dumps(payload)
+    mock_llm = MagicMock()
+    mock_llm.invoke.return_value = mock_msg
+    mock_get_llm.return_value = mock_llm
+
+    from src.agents.planner import run_planner
+
+    result = run_planner("What is the average rating in Appliances?")
+    assert result["category_filter"] == "Appliances"

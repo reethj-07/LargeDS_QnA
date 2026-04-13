@@ -21,8 +21,10 @@ from evaluation.metrics import (  # noqa: E402
     precision_at_k,
     recall_at_k,
 )
+from src.config import DUCKDB_PATH  # noqa: E402
 from src.embeddings.embedder import Embedder  # noqa: E402
 from src.retrieval.hybrid_retriever import HybridRetriever  # noqa: E402
+from src.storage.sql_store import SqlStore  # noqa: E402
 
 
 def _eval_mode(
@@ -87,7 +89,10 @@ def run_ablation(questions_path: Path, k_values: list[int], out_path: Path) -> l
     print(f"  Using {len(retrieval_qs)} retrieval-primary questions "
           f"(skipping {len(qs) - len(retrieval_qs)} sql-only)")
 
-    hybrid = HybridRetriever(embedder=Embedder())
+    hybrid = HybridRetriever(
+        embedder=Embedder(),
+        sql_store=SqlStore(DUCKDB_PATH, read_only=True),
+    )
     hybrid.load_indices()
 
     rows: list[dict] = []

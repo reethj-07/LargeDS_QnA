@@ -213,8 +213,10 @@ def generate_report(results_path: Path, out_path: Path) -> None:
         if lats:
             lines.append(f"- **Mean latency:** {sum(lats)/len(lats):.1f}s per question")
         errs = [r for r in aq if "error" in r]
-        if errs:
-            lines.append(f"- **Pipeline errors:** {len(errs)}/{len(aq)}")
+        lines.append(
+            f"- **Pipeline errors:** {len(errs)}/{len(aq)}"
+            + (" (none)" if not errs else ""),
+        )
 
     # ── Regeneration ──────────────────────────────────────────────────────
     lines.append("\n## Regenerating this report\n")

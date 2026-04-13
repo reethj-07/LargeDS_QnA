@@ -17,8 +17,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from evaluation.metrics import mrr_at_k, ndcg_at_k, precision_at_k, recall_at_k  # noqa: E402
+from src.config import DUCKDB_PATH  # noqa: E402
 from src.embeddings.embedder import Embedder  # noqa: E402
 from src.retrieval.hybrid_retriever import HybridRetriever  # noqa: E402
+from src.storage.sql_store import SqlStore  # noqa: E402
 
 _CATEGORY_KEYWORDS = {
     "All_Beauty": "All_Beauty",
@@ -52,7 +54,10 @@ def main() -> None:
     max_k = max(k_values)
 
     qs = load_questions(args.questions)
-    hybrid = HybridRetriever(embedder=Embedder())
+    hybrid = HybridRetriever(
+        embedder=Embedder(),
+        sql_store=SqlStore(DUCKDB_PATH, read_only=True),
+    )
     hybrid.load_indices()
 
     category_cache: dict[str, set[int]] = {}

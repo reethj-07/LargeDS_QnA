@@ -8,10 +8,18 @@ from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from src.config import REVIEW_CATEGORY_NAMES
 from src.llm.chat import get_chat_llm, require_any_llm_key
 from src.observability.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def _normalize_category_filter(raw: Any) -> str:
+    if raw is None:
+        return ""
+    s = str(raw).strip()
+    return s if s in REVIEW_CATEGORY_NAMES else ""
 
 SYSTEM = """You are a planner for an e-commerce analytics Q&A system over Amazon product reviews.
 
@@ -34,6 +42,7 @@ Respond with ONLY a JSON object (no markdown) with keys:
 - plan: 2-5 bullet steps as a single string
 - sql_suggestion: either empty string OR a single safe DuckDB SELECT query using table reviews ONLY, if the user needs aggregates/filters/counts. Use only SELECT. No semicolons. If unsure, use empty string.
 - search_query: a short English query optimized for semantic + keyword retrieval over review text (combine key entities).
+- category_filter: empty string OR exactly one of the five category names above when the user clearly asks about that single category only (narrows retrieval). For cross-category or global questions, use empty string.
 """
 
 
@@ -64,11 +73,13 @@ def run_planner(user_query: str) -> dict[str, Any]:
             "plan": "1) Retrieve relevant reviews. 2) Synthesize answer from evidence.",
             "sql_suggestion": "",
             "search_query": user_query,
+            "category_filter": "",
         }
     data.setdefault("query_type", "multi_hop")
     data.setdefault("plan", "")
     data.setdefault("sql_suggestion", "")
     data.setdefault("search_query", user_query)
+    data["category_filter"] = _normalize_category_filter(data.get("category_filter"))
 
     # Derive route if the LLM didn't return one
     if "route" not in data or data["route"] not in ("direct", "decompose", "sql_first"):
