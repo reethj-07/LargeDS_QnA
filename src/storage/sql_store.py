@@ -8,15 +8,56 @@ from typing import Any
 
 import duckdb
 
+from src.config import SQL_MAX_ROWS
 from src.observability.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Only SELECT allowed; block multiple statements and dangerous keywords
+# Only SELECT allowed; block dangerous keywords (DuckDB surface)
 _FORBIDDEN = re.compile(
-    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|ATTACH|DETACH|COPY|EXPORT|IMPORT|PRAGMA)\b",
+    r"\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|ATTACH|DETACH|COPY|EXPORT|IMPORT|PRAGMA|"
+    r"CALL|LOAD|INSTALL|CHECKPOINT|VACUUM)\b",
     re.IGNORECASE,
 )
+
+# Chained statement after semicolon (ignore semicolons inside string literals for v1)
+_CHAINED_STMT = re.compile(
+    r";\s*(?:SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|COPY|PRAGMA|ATTACH)\b",
+    re.IGNORECASE,
+)
+
+_FROM_REVIEWS = re.compile(r"\bfrom\s+reviews\b", re.IGNORECASE)
+
+
+def _strip_sql_comments(sql: str) -> str:
+    """Remove line comments so keywords in comments do not trip guards."""
+    lines = []
+    for line in sql.splitlines():
+        if "--" in line:
+            line = line.split("--", 1)[0]
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _validate_and_cap_llm_sql(sql: str, *, max_rows: int) -> str:
+    """Extra checks for LLM-generated SELECT (single-table reviews corpus)."""
+    s = sql.strip().rstrip(";")
+    s = _strip_sql_comments(s)
+    if not s.upper().startswith("SELECT"):
+        raise ValueError("Only SELECT queries are allowed.")
+    if _CHAINED_STMT.search(s):
+        raise ValueError("Multiple statements are not allowed.")
+    if _FORBIDDEN.search(s):
+        raise ValueError("Query contains forbidden keywords.")
+    if re.search(r"\bUNION\b", s, re.IGNORECASE):
+        raise ValueError("UNION is not allowed in agent SQL.")
+    if re.search(r"\bJOIN\b", s, re.IGNORECASE):
+        raise ValueError("JOIN is not allowed in agent SQL.")
+    if not _FROM_REVIEWS.search(s):
+        raise ValueError("Query must read from the reviews table only.")
+
+    # Hard row cap: wrap so an inner LIMIT cannot exceed *max_rows*.
+    return f"SELECT * FROM ({s}) AS _agent_limited LIMIT {int(max_rows)}"
 
 
 class SqlStore:
@@ -81,15 +122,10 @@ class SqlStore:
             ],
         )
 
-    def query_safe(self, sql: str) -> list[dict[str, Any]]:
-        """Execute a single SELECT if it passes safety checks."""
-        s = sql.strip().rstrip(";")
-        if not s.upper().startswith("SELECT"):
-            raise ValueError("Only SELECT queries are allowed.")
-        if ";" in s:
-            raise ValueError("Multiple statements are not allowed.")
-        if _FORBIDDEN.search(s):
-            raise ValueError("Query contains forbidden keywords.")
+    def query_safe(self, sql: str, *, max_rows: int | None = None) -> list[dict[str, Any]]:
+        """Execute a single SELECT on ``reviews`` if it passes safety checks."""
+        cap = max_rows if max_rows is not None else SQL_MAX_ROWS
+        s = _validate_and_cap_llm_sql(sql, max_rows=cap)
         con = self.connect()
         try:
             df = con.execute(s).fetchdf()

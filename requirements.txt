@@ -1,3 +1,7 @@
+# Runtime dependency ranges (quick local install).
+# Reproducible / CI / Docker: use ``pip install -r requirements.lock`` (see ``requirements.in``).
+# Regenerate lock: ``python -m piptools compile requirements.in -o requirements.lock``
+#
 # Core (pin loosely; user may have newer globally)
 python-dotenv>=1.0.0
 huggingface-hub>=0.25.0
@@ -15,10 +19,14 @@ langchain>=0.3.28,<0.4
 langchain-core>=0.3.83,<0.4
 langchain-groq>=0.2.0
 langchain-google-genai>=2.1.12,<3
-langgraph>=0.2.0
+langgraph>=0.2.0,<1.0
 
 # UI
 gradio>=5.0.0
+
+# HTTP API (optional; `python -m src.api.main`)
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
 
 # Utils
 tenacity>=8.0.0

@@ -11,6 +11,12 @@ services:
         value: "0"
       - key: PORT
         value: "7860"
+      - key: DUCKDB_READ_ONLY
+        value: "true"
+      - key: USE_SHARED_HYBRID
+        value: "true"
+      - key: LOG_QUERY_PREVIEWS
+        value: "false"
     disk:
       name: data
       mountPath: /app/data

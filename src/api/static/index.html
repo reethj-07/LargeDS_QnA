@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Big Data Q&A</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; background: #0f1419; color: #e7ecf3; }
+    body { max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; font-weight: 600; }
+    textarea { width: 100%; min-height: 120px; padding: 0.75rem; border-radius: 8px;
+      border: 1px solid #2a3444; background: #151c26; color: inherit; font-size: 1rem; }
+    button { margin-top: 0.75rem; padding: 0.5rem 1.25rem; border-radius: 8px; border: none;
+      background: #3b82f6; color: #fff; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    pre { white-space: pre-wrap; background: #151c26; padding: 1rem; border-radius: 8px;
+      border: 1px solid #2a3444; font-size: 0.85rem; }
+    .meta { font-size: 0.8rem; color: #9aa5b5; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Big Data Q&A — API client</h1>
+  <p class="meta">POSTs to <code>/v1/query</code> on this origin. For the full UI use Gradio (<code>python -m src.ui.app</code>).</p>
+  <textarea id="q" placeholder="Ask about the review dataset…"></textarea>
+  <button id="go">Run query</button>
+  <p class="meta" id="trace"></p>
+  <pre id="out"></pre>
+  <script>
+    const go = document.getElementById("go");
+    const q = document.getElementById("q");
+    const out = document.getElementById("out");
+    const trace = document.getElementById("trace");
+    go.onclick = async () => {
+      go.disabled = true;
+      trace.textContent = "";
+      out.textContent = "…";
+      try {
+        const res = await fetch("/v1/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: q.value }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          out.textContent = JSON.stringify(data, null, 2);
+          trace.textContent = "Request failed";
+          return;
+        }
+        trace.textContent = "trace_id: " + (data.trace_id || "—");
+        out.textContent = data.answer || JSON.stringify(data, null, 2);
+      } catch (e) {
+        out.textContent = String(e);
+      } finally {
+        go.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>

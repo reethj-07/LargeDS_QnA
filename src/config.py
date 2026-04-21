@@ -81,3 +81,36 @@ CROSS_ENCODER_MODEL = os.getenv(
 # Agent
 MAX_RETRIEVAL_RETRIES = int(os.getenv("MAX_RETRIEVAL_RETRIES", "2"))
 CRITIC_PASS_THRESHOLD = float(os.getenv("CRITIC_PASS_THRESHOLD", "3.0"))
+
+# Serving: reuse one HybridRetriever per process (recommended for UI/API).
+USE_SHARED_HYBRID = os.getenv("USE_SHARED_HYBRID", "1").strip().lower() in ("1", "true", "yes")
+
+# DuckDB opened by HybridRetriever: read-only by default (ingestion uses its own SqlStore).
+DUCKDB_READ_ONLY = os.getenv("DUCKDB_READ_ONLY", "1").strip().lower() in ("1", "true", "yes")
+
+# LLM HTTP timeouts (seconds). 0 = library default.
+LLM_REQUEST_TIMEOUT_S = float(os.getenv("LLM_REQUEST_TIMEOUT_S", "120"))
+
+# Logs: when false, pipeline_query omits raw query text (only length / hash prefix).
+LOG_QUERY_PREVIEWS = os.getenv("LOG_QUERY_PREVIEWS", "1").strip().lower() in ("1", "true", "yes")
+
+# Planner / analyst SQL path: max rows returned from DuckDB per query.
+SQL_MAX_ROWS = max(1, int(os.getenv("SQL_MAX_ROWS", "500")))
+
+# Optional Gradio HTTP basic auth (set both to enable).
+GRADIO_AUTH_USER = os.getenv("GRADIO_AUTH_USER", "").strip()
+GRADIO_AUTH_PASSWORD = os.getenv("GRADIO_AUTH_PASSWORD", "").strip()
+
+# Wall-clock cap for LangGraph ``invoke`` (seconds). 0 = disabled.
+# Invokes run under a process lock so FAISS/DuckDB are not used concurrently from multiple threads.
+PIPELINE_TIMEOUT_S = float(os.getenv("PIPELINE_TIMEOUT_S", "0"))
+
+
+def indices_artifacts_ready() -> bool:
+    """True when FAISS, BM25, and DuckDB index files exist (after ``scripts/ingest.py``)."""
+    return (
+        FAISS_INDEX_PATH.is_file()
+        and FAISS_META_PATH.is_file()
+        and BM25_PATH.is_file()
+        and DUCKDB_PATH.is_file()
+    )

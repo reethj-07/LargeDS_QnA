@@ -9,8 +9,10 @@ import numpy as np
 from src.config import (
     BM25_TOP_K,
     DUCKDB_PATH,
+    DUCKDB_READ_ONLY,
     FINAL_TOP_K,
     RERANK_POOL,
+    REVIEW_CATEGORY_NAMES,
     RRF_K,
     USE_CROSS_ENCODER,
     VECTOR_TOP_K,
@@ -33,7 +35,7 @@ class HybridRetriever:
         self.embedder = embedder or Embedder()
         self.vector_store = vector_store or VectorStore()
         self.bm25_store = bm25_store or BM25Store()
-        self.sql_store = sql_store or SqlStore(DUCKDB_PATH)
+        self.sql_store = sql_store or SqlStore(DUCKDB_PATH, read_only=DUCKDB_READ_ONLY)
 
     def load_indices(self) -> None:
         self.vector_store.load()
@@ -140,9 +142,11 @@ class HybridRetriever:
 
     def get_ids_for_category(self, category: str) -> set[int]:
         """Return all review ids that belong to *category* (for metadata filtering)."""
+        if category not in REVIEW_CATEGORY_NAMES:
+            return set()
         con = self.sql_store.connect()
-        safe = category.replace("'", "''")
         rows = con.execute(
-            f"SELECT id FROM reviews WHERE category = '{safe}'"
+            "SELECT id FROM reviews WHERE category = ?",
+            [category],
         ).fetchall()
         return {int(r[0]) for r in rows}

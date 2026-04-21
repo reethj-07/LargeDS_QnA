@@ -25,7 +25,8 @@ def main() -> None:
         print("Usage: python scripts/query.py \"Your question\"")
         sys.exit(1)
     out = run_agent_pipeline(q)
-    print("=== Answer ===\n")
+    print("=== Trace ID ===\n", out.get("trace_id", ""))
+    print("\n=== Answer ===\n")
     print(out.get("answer", ""))
     print("\n=== Trace ===\n")
     for line in out.get("agent_trace", []):

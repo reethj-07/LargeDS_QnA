@@ -1,0 +1,4 @@
+-r requirements.lock
+ruff>=0.8.0
+mypy>=1.11.0
+pip-tools>=7.4.0

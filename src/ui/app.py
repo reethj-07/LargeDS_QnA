@@ -5,12 +5,17 @@ from __future__ import annotations
 import json
 import os
 import time
+import traceback
 from typing import Any
 
 import gradio as gr
 
 from src.agents.graph import run_agent_pipeline
-from src.observability.logger import log_event
+from src.config import GRADIO_AUTH_PASSWORD, GRADIO_AUTH_USER
+from src.observability.logger import get_logger, log_event
+from src.observability.tracing import new_trace_id
+
+logger = get_logger(__name__)
 
 EXAMPLES = [
     "What is the average rating by category?",
@@ -35,18 +40,32 @@ def run_once(message: str) -> tuple[str, str, str, str, list[list]]:
     if not (message or "").strip():
         return "", "", "", "", []
 
+    tid = new_trace_id()
     log_event("ui_query", {"q_len": len(message)})
     t0 = time.time()
-    out: dict[str, Any] = run_agent_pipeline(message.strip())
+    try:
+        out: dict[str, Any] = run_agent_pipeline(message.strip(), trace_id=tid)
+    except Exception as e:
+        logger.exception("ui_query_failed trace_id=%s", tid)
+        log_event("ui_query_error", {"trace_id": tid, "error": str(e)[:500]})
+        err_msg = (
+            "The request failed while running the agent pipeline. "
+            f"Use trace_id **{tid}** when checking server logs.\n\n"
+            f"Details: {type(e).__name__}: {e}"
+        )
+        return err_msg, traceback.format_exc()[:4000], f"Error  |  trace={tid}", "", []
+
     elapsed = time.time() - t0
 
     # -- Query type badge --
     qt = out.get("query_type", "unknown")
     route = out.get("route", "direct")
     cf = (out.get("category_filter") or "").strip()
-    badge = f"Type: {qt}  |  Route: {route}  |  {elapsed:.1f}s"
+    badge = f"Type: {qt}  |  Route: {route}  |  {elapsed:.1f}s  |  trace={tid}"
     if cf:
         badge += f"  |  Retrieval category: {cf}"
+    if out.get("error"):
+        badge += f"  |  error={out['error']}"
 
     # -- Sub-questions --
     subs = out.get("sub_questions") or []
@@ -60,6 +79,7 @@ def run_once(message: str) -> tuple[str, str, str, str, list[list]]:
     critique = (out.get("critique") or "")[:600]
     trace_lines.append(f"critique={critique}")
     meta = {
+        "trace_id": tid,
         "query_type": qt,
         "route": route,
         "sub_questions": len(subs),
@@ -88,11 +108,7 @@ def run_once(message: str) -> tuple[str, str, str, str, list[list]]:
 
 
 def build_demo() -> gr.Blocks:
-    with gr.Blocks(
-        title="Big Data Q&A -- E-commerce Analytics",
-        css=CSS,
-        theme=gr.themes.Soft(),
-    ) as demo:
+    with gr.Blocks(title="Big Data Q&A -- E-commerce Analytics") as demo:
         gr.Markdown(
             "# E-commerce Analytics Agent\n"
             "**150K Amazon reviews** | **FAISS + BM25 + Cross-encoder** | "
@@ -139,7 +155,16 @@ def build_demo() -> gr.Blocks:
 
 def main() -> None:
     port = int(os.getenv("PORT", "7860"))
-    build_demo().launch(server_name="0.0.0.0", server_port=port)
+    auth = None
+    if GRADIO_AUTH_USER and GRADIO_AUTH_PASSWORD:
+        auth = (GRADIO_AUTH_USER, GRADIO_AUTH_PASSWORD)
+    build_demo().launch(
+        server_name="0.0.0.0",
+        server_port=port,
+        theme=gr.themes.Soft(),
+        css=CSS,
+        auth=auth,
+    )
 
 
 if __name__ == "__main__":

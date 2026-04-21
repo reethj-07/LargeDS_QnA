@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.runnables import Runnable
@@ -13,6 +13,7 @@ from src.config import (
     GEMINI_MAX_RETRIES,
     GROQ_API_KEY,
     LLM_PRIMARY,
+    LLM_REQUEST_TIMEOUT_S,
     MODEL_ANALYST,
     MODEL_CRITIC,
     MODEL_GEMINI_ANALYST,
@@ -47,22 +48,36 @@ def _groq_chat(model_name: str, temperature: float) -> BaseChatModel:
 
     if not GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY is required for Groq but is empty.")
-    return ChatGroq(
-        groq_api_key=GROQ_API_KEY,
-        model_name=model_name,
-        temperature=temperature,
-    )
+    kwargs: dict[str, Any] = {
+        "groq_api_key": GROQ_API_KEY,
+        "model_name": model_name,
+        "temperature": temperature,
+    }
+    if LLM_REQUEST_TIMEOUT_S > 0:
+        kwargs["timeout"] = LLM_REQUEST_TIMEOUT_S
+    try:
+        return ChatGroq(**kwargs)
+    except TypeError:
+        kwargs.pop("timeout", None)
+        return ChatGroq(**kwargs)
 
 
 def _gemini_chat(model_name: str, temperature: float) -> BaseChatModel:
     from langchain_google_genai import ChatGoogleGenerativeAI
 
-    return ChatGoogleGenerativeAI(
-        model=model_name,
-        google_api_key=GEMINI_API_KEY,
-        temperature=temperature,
-        max_retries=GEMINI_MAX_RETRIES,
-    )
+    kwargs: dict[str, Any] = {
+        "model": model_name,
+        "google_api_key": GEMINI_API_KEY,
+        "temperature": temperature,
+        "max_retries": GEMINI_MAX_RETRIES,
+    }
+    if LLM_REQUEST_TIMEOUT_S > 0:
+        kwargs["timeout"] = LLM_REQUEST_TIMEOUT_S
+    try:
+        return ChatGoogleGenerativeAI(**kwargs)
+    except TypeError:
+        kwargs.pop("timeout", None)
+        return ChatGoogleGenerativeAI(**kwargs)
 
 
 def _build_llm(role: ChatRole) -> Runnable:
@@ -97,11 +112,13 @@ def _build_llm(role: ChatRole) -> Runnable:
 
     if GEMINI_INVOKE_RETRY_ATTEMPTS > 1:
         try:
-            from google.api_core.exceptions import ResourceExhausted
-            from google.api_core.exceptions import ServiceUnavailable
-            from google.api_core.exceptions import TooManyRequests
+            from google.api_core.exceptions import (
+                ResourceExhausted,
+                ServiceUnavailable,
+                TooManyRequests,
+            )
 
-            gemini_llm = gemini_llm.with_retry(
+            gemini_llm = gemini_llm.with_retry(  # type: ignore[assignment]
                 retry_if_exception_type=(ResourceExhausted, ServiceUnavailable, TooManyRequests),
                 stop_after_attempt=GEMINI_INVOKE_RETRY_ATTEMPTS,
                 wait_exponential_jitter=True,

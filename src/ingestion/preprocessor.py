@@ -6,7 +6,6 @@ import re
 import unicodedata
 from typing import Any
 
-
 _WS = re.compile(r"\s+")
 
 

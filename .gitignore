@@ -45,3 +45,6 @@ Thumbs.db
 .cursor/
 *.tmp
 *.bak
+
+# Demo video binaries (host links in DEMO_VIDEO/README.md instead)
+DEMO_VIDEO/*.mp4

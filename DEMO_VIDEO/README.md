@@ -2,7 +2,7 @@
 
 **Where to put your link:** Edit this file and replace the placeholder on the line **`Demo URL:`** in the [Demo URL](#demo-url) section below (same place the assignment README points to). Use a Loom, YouTube (unlisted), Google Drive share link, or any URL graders can open.
 
-**Status:** Record when ready.
+**Status:** Recording uploaded; demo link below. (Local copy: `Screen Recording 2026-04-13 220948.mp4` — optional; graders use the URL.)
 
 Record a **Loom** or local MP4 showing the following three scenarios:
 
@@ -39,6 +39,8 @@ Record a **Loom** or local MP4 showing the following three scenarios:
 
 ## Demo URL
 
-Paste your recording here (this is the link reviewers open):
+This is the link reviewers open (also referenced from the root [`README.md`](../README.md) submission checklist):
 
-- **Demo URL:** _add your link here_
+- **Demo URL:** https://drive.google.com/file/d/1pMqDyZvXZMlpS5l8X-IUt3igcNr8pfUD/view?usp=sharing
+
+**Google Drive access:** In Drive, open the file → **Share** → set **General access** to **Anyone with the link** (Viewer) so graders do not need to request access or sign in with your account.

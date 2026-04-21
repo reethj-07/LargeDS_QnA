@@ -35,6 +35,10 @@ copy .env.example .env
 # Optional: LLM_PRIMARY=groq to force Groq and skip Gemini.
 ```
 
+**Reproducible installs:** CI and the Dockerfile install from **`requirements.lock`** (generated from `requirements.in`). To refresh pins after editing constraints: `python -m pip install pip-tools` then `python -m piptools compile requirements.in -o requirements.lock` (use the same Python major/minor you deploy with, e.g. 3.11 on Linux CI).
+
+**Production-oriented env vars** (see `.env.example`): `USE_SHARED_HYBRID`, `DUCKDB_READ_ONLY`, `LOG_QUERY_PREVIEWS`, `LLM_REQUEST_TIMEOUT_S`, optional `PIPELINE_TIMEOUT_S` (wall-clock cap on the full LangGraph run; the worker thread may still finish in the background after a timeout), optional Gradio HTTP basic auth (`GRADIO_AUTH_USER` / `GRADIO_AUTH_PASSWORD`).
+
 ### 1) Ingest data and build indices
 
 Default: **5 categories x 30,000 reviews = 150,000 rows** (may take **30-90+ minutes** on CPU for embedding).
@@ -69,6 +73,14 @@ python -m src.ui.app
 ```
 
 Open the printed local URL (default `http://localhost:7860`).
+
+### 3b) JSON API (FastAPI)
+
+```powershell
+python -m src.api.main
+```
+
+Default **`http://localhost:8000`**: `GET /healthz`, `GET /readyz` (indices present), `POST /v1/query` with body `{"query": "..."}`. A minimal static client is served at `/` from `src/api/static/`. Set **`API_PORT`** to change the listen port.
 
 ### 4) Retrieval evaluation
 
@@ -111,7 +123,7 @@ python scripts/sql_eval.py
 
 ### 7) Unit tests
 
-**30+ tests** covering metrics, RRF, preprocessor, SQL safety, decomposer, and synthesizer:
+**60+ tests** covering metrics, RRF, preprocessor, SQL safety, agents, pipeline timeout, and synthesizer:
 
 ```powershell
 python -m pytest -v
@@ -125,7 +137,7 @@ CI (`.github/workflows/ci.yml`) runs tests with `USE_CROSS_ENCODER=0`.
 
 - [ ] Repo **public** *or* **private** with collaborator `uptiq-chaitanya` (read) per assignment.
 - [ ] Submit **Google Form** with repo link: [forms.gle/9iPeUBHKcdHhuSq67](https://forms.gle/9iPeUBHKcdHhuSq67).
-- [ ] Record **demo video** (complex query + failure case) when ready -- paste the URL in **`DEMO_VIDEO/README.md`** under **Demo URL**.
+- [x] **Demo video** — URL in **`DEMO_VIDEO/README.md`**: [Google Drive](https://drive.google.com/file/d/1pMqDyZvXZMlpS5l8X-IUt3igcNr8pfUD/view?usp=sharing) (set file sharing to **Anyone with the link** in Drive).
 
 **Repo evaluation artifacts (regenerate anytime):**
 
@@ -170,6 +182,8 @@ When `GEMINI_API_KEY` or `GOOGLE_API_KEY` is set and `LLM_PRIMARY` is not `groq`
 docker build -t bigdata-qna .
 docker run -p 7860:7860 --env-file .env bigdata-qna
 ```
+
+The image installs **`requirements.lock`** for reproducible dependency versions.
 
 ### Render
 
@@ -234,10 +248,12 @@ Per-agent spans with attributes (query, doc_count, latency) exported to console 
 | `src/llm/` | Gemini + Groq routing (`get_chat_llm`, fallbacks) |
 | `src/observability/` | Structured logging + OTel tracing |
 | `src/ui/` | Gradio app with tabbed trace/observability UI |
+| `src/api/` | FastAPI JSON API + minimal static client |
 | `evaluation/` | Questions, metrics, batch eval, ablation, answer quality, SQL accuracy |
-| `scripts/` | `ingest.py`, `query.py`, `evaluate.py`, `ablation.py`, `answer_quality.py`, `sql_eval.py` |
-| `tests/` | Unit tests (metrics, RRF, preprocessor, SQL safety, decomposer, synthesizer) |
-| `.github/workflows/` | CI: pytest on every push / PR |
+| `scripts/` | `ingest.py`, `query.py`, `evaluate.py`, `compile_requirements.py`, … |
+| `tests/` | Unit tests (metrics, RRF, preprocessor, SQL safety, agents, API smoke) |
+| `requirements.in` / `requirements.lock` | Pinned deps for Docker / CI (`pip-compile`) |
+| `.github/workflows/` | CI: ruff, mypy, pytest, Docker build |
 | `Dockerfile` | Container build for deployment |
 | `render.yaml` | Render deployment config |
 

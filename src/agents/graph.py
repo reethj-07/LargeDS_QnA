@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from typing import Any
 
 from langgraph.graph import END, StateGraph
@@ -14,10 +17,22 @@ from src.agents.planner import run_planner
 from src.agents.retriever_agent import run_retrieval
 from src.agents.state import AgentState
 from src.agents.synthesizer import merge_sub_results
-from src.config import FINAL_TOP_K, MAX_RETRIEVAL_RETRIES
-from src.observability.logger import log_event
-from src.observability.tracing import new_trace_id, span
+from src.config import (
+    FINAL_TOP_K,
+    LOG_QUERY_PREVIEWS,
+    MAX_RETRIEVAL_RETRIES,
+    PIPELINE_TIMEOUT_S,
+    USE_SHARED_HYBRID,
+    indices_artifacts_ready,
+)
+from src.observability.logger import log_event, query_preview_log_payload
+from src.observability.tracing import get_trace_id, new_trace_id, set_trace_id, span
 from src.retrieval.hybrid_retriever import HybridRetriever
+
+_shared_hybrid: HybridRetriever | None = None
+_shared_lock = threading.Lock()
+# Serialize graph.invoke so timeout workers and the main path never hit FAISS concurrently.
+_pipeline_invoke_lock = threading.RLock()
 
 # Bound analyst prompt size (Groq 8b free tier: ~6k input tokens/request on many accounts).
 _MAX_ANALYST_CONTEXT_CHARS = 5_500
@@ -291,25 +306,141 @@ def build_graph(hybrid: HybridRetriever):
     return graph.compile()
 
 
+def get_shared_hybrid_retriever() -> HybridRetriever:
+    """Lazily load indices once per process (used by UI/API when ``USE_SHARED_HYBRID``)."""
+    global _shared_hybrid
+    with _shared_lock:
+        if _shared_hybrid is None:
+            _shared_hybrid = HybridRetriever()
+            _shared_hybrid.load_indices()
+        return _shared_hybrid
+
+
+def _invoke_graph_app(app: Any, init: AgentState) -> dict[str, Any]:
+    with _pipeline_invoke_lock:
+        return app.invoke(init)
+
+
+def _timeout_response(user_query: str, timeout_s: float) -> dict[str, Any]:
+    msg = (
+        f"The query exceeded the server time limit ({timeout_s:g}s) and was stopped. "
+        "Try a shorter question, disable cross-encoder, or raise PIPELINE_TIMEOUT_S."
+    )
+    return {
+        "query": user_query,
+        "answer": msg,
+        "error": "pipeline_timeout",
+        "query_type": "unknown",
+        "route": "direct",
+        "plan": "",
+        "sql_suggestion": "",
+        "search_query": user_query,
+        "category_filter": "",
+        "sub_questions": [],
+        "retrieved_docs": [],
+        "sql_results": [],
+        "retrieval_scores": [],
+        "sub_answers": [],
+        "critique": "",
+        "confidence": 0.0,
+        "needs_retry": False,
+        "retry_count": 0,
+        "agent_trace": [f"Error: pipeline_timeout (limit {timeout_s:g}s)"],
+        "trace_id": get_trace_id(),
+    }
+
+
+def reset_shared_hybrid_retriever() -> None:
+    """Release the shared retriever (tests or after rebuilding indices in-process)."""
+    global _shared_hybrid
+    with _shared_lock:
+        if _shared_hybrid is not None:
+            try:
+                _shared_hybrid.sql_store.close()
+            except Exception:
+                pass
+            _shared_hybrid = None
+
+
 def run_agent_pipeline(
     user_query: str,
     hybrid: HybridRetriever | None = None,
+    *,
+    trace_id: str | None = None,
+    pipeline_timeout_s: float | None = None,
 ) -> dict[str, Any]:
-    tid = new_trace_id()
+    if trace_id:
+        set_trace_id(trace_id)
+    else:
+        new_trace_id()
     log_event(
         "pipeline_query",
         {
-            "trace_id": tid,
-            "char_len": len(user_query),
-            "query_preview": user_query[:400],
+            **query_preview_log_payload(user_query, enabled=LOG_QUERY_PREVIEWS),
         },
     )
-    h = hybrid or HybridRetriever()
-    h.load_indices()
+    if not indices_artifacts_ready():
+        msg = (
+            "Search indices are not available on this server. "
+            "Run `python scripts/ingest.py` locally (or on the host) to build "
+            "`data/indices/` (FAISS, BM25, DuckDB), then restart the app."
+        )
+        return {
+            "query": user_query,
+            "answer": msg,
+            "error": "indices_missing",
+            "query_type": "unknown",
+            "route": "direct",
+            "plan": "",
+            "sql_suggestion": "",
+            "search_query": user_query,
+            "category_filter": "",
+            "sub_questions": [],
+            "retrieved_docs": [],
+            "sql_results": [],
+            "retrieval_scores": [],
+            "sub_answers": [],
+            "critique": "",
+            "confidence": 0.0,
+            "needs_retry": False,
+            "retry_count": 0,
+            "agent_trace": ["Error: indices_missing (run scripts/ingest.py)"],
+            "trace_id": get_trace_id(),
+        }
+
+    if hybrid is not None:
+        h = hybrid
+    elif USE_SHARED_HYBRID:
+        h = get_shared_hybrid_retriever()
+    else:
+        h = HybridRetriever()
+        h.load_indices()
     app = build_graph(h)
     init: AgentState = {
         "query": user_query,
         "retry_count": 0,
         "agent_trace": [],
     }
-    return app.invoke(init)
+    timeout_s = float(PIPELINE_TIMEOUT_S if pipeline_timeout_s is None else pipeline_timeout_s)
+    pool: ThreadPoolExecutor | None = None
+    try:
+        if timeout_s > 0:
+            pool = ThreadPoolExecutor(max_workers=1)
+            fut = pool.submit(_invoke_graph_app, app, init)
+            try:
+                raw = fut.result(timeout=timeout_s)
+            except FuturesTimeoutError:
+                log_event(
+                    "pipeline_invoke_timeout",
+                    {"timeout_s": timeout_s, "note": "worker may still finish in background"},
+                )
+                return _timeout_response(user_query, timeout_s)
+        else:
+            raw = _invoke_graph_app(app, init)
+    finally:
+        if pool is not None:
+            pool.shutdown(wait=False, cancel_futures=False)
+
+    out: dict[str, Any] = dict(raw)
+    out["trace_id"] = get_trace_id()
+    return out

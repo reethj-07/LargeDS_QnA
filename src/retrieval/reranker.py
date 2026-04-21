@@ -19,7 +19,7 @@ def _get_cross_encoder(model_name: str | None = None):
         from sentence_transformers import CrossEncoder
 
         _ce_model = CrossEncoder(name)
-        _ce_model._model_name = name  # type: ignore[attr-defined]
+        setattr(_ce_model, "_model_name", name)
     return _ce_model
 
 

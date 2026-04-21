@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from src.ingestion.preprocessor import clean_text, parse_bool, parse_float, parse_int, preprocess_records
+from src.ingestion.preprocessor import (
+    clean_text,
+    parse_bool,
+    parse_float,
+    parse_int,
+    preprocess_records,
+)
 
 
 def test_clean_text_strips_html():

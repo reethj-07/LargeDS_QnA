@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from src.config import PROJECT_ROOT
@@ -31,6 +31,14 @@ def _setup_logger(name: str = "bigdata_qna") -> logging.Logger:
 
 def get_logger(name: str = "bigdata_qna") -> logging.Logger:
     return _setup_logger(name)
+
+
+def query_preview_log_payload(query: str, *, enabled: bool, max_len: int = 400) -> dict[str, Any]:
+    """Fields for logging a user query (honour ``LOG_QUERY_PREVIEWS``)."""
+    if enabled:
+        return {"query_preview": query[:max_len], "char_len": len(query)}
+    digest = hashlib.sha256(query.encode("utf-8")).hexdigest()[:12]
+    return {"query_sha256_12": digest, "char_len": len(query)}
 
 
 def log_event(
